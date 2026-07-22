@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String       @id @default(uuid())
+  email             String?      @unique
+  passwordHash      String?
+  githubId          String?      @unique
+  githubUsername    String?
+  githubAvatarUrl   String?
+  githubAccessToken String?
+  weeklyReportEmail Boolean      @default(true)
+  syncNotifications Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  repositories  Repository[]
+}
+
+model Repository {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  githubId    Int       @unique
+  name        String
+  fullName    String
+  description String?
+  language    String?
+  private     Boolean   @default(false)
+  syncEnabled Boolean   @default(true)
+  lastSyncAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  syncJobs     SyncJob[]
+  pullRequests PullRequest[]
+  commits      Commit[]
+}
+
+model SyncJob {
+  id           String     @id @default(uuid())
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  status       String     @default("queued")
+  startedAt    DateTime?
+  completedAt  DateTime?
+  error        String?
+  createdAt    DateTime   @default(now())
+
+  @@index([repositoryId, status])
+}
+
+model PullRequest {
+  id              String     @id @default(uuid())
+  repositoryId    String
+  repository      Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  githubPrId      Int
+  number          Int
+  title           String
+  state           String
+  authorLogin     String
+  authorAvatarUrl String?
+  createdAt       DateTime
+  closedAt        DateTime?
+  mergedAt        DateTime?
+  additions       Int        @default(0)
+  deletions       Int        @default(0)
+  changedFiles    Int        @default(0)
+  reviewCount     Int        @default(0)
+  commentCount    Int        @default(0)
+  syncedAt        DateTime   @default(now())
+
+  @@unique([repositoryId, githubPrId])
+  @@index([repositoryId, createdAt])
+}
+
+model Commit {
+  id           String     @id @default(uuid())
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  sha          String     @unique
+  message      String
+  authorLogin  String?
+  authorEmail  String?
+  committedAt  DateTime
+  additions    Int        @default(0)
+  deletions    Int        @default(0)
+  syncedAt     DateTime   @default(now())
+
+  @@index([repositoryId, committedAt])
+}
