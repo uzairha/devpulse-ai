@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { register, login, getMe } from '../controllers/authController.js';
+import { register, login, getMe, githubRedirect, githubCallback } from '../controllers/authController.js';
 import validate from '../middleware/validate.js';
 import requireAuth from '../middleware/requireAuth.js';
 
@@ -27,5 +27,7 @@ router.post(
 );
 
 router.get('/me', requireAuth, getMe);
+router.get('/github', githubRedirect);
+router.get('/github/callback', githubCallback);
 
 export default router;
