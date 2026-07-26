@@ -5,7 +5,9 @@ import Layout from './components/Layout/Layout';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import AuthCallbackPage from './pages/AuthCallbackPage';
 import DashboardPage from './pages/DashboardPage';
+import ReposPage from './pages/ReposPage';
 
 function App() {
   const { user, isLoading } = useAuth();
@@ -15,6 +17,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route
         path="/login"
         element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />}
@@ -29,6 +32,16 @@ function App() {
           <ProtectedRoute>
             <Layout>
               <DashboardPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/repos"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ReposPage />
             </Layout>
           </ProtectedRoute>
         }
