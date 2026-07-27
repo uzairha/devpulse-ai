@@ -134,6 +134,41 @@
   text-overflow: ellipsis;
 }
 
+.repo-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.sync-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  margin-top: 0.35rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+}
+
+.sync-badge--running {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.sync-badge--ok {
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.sync-badge--failed {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.sync-badge--none {
+  color: #9ca3af;
+  background: #f3f4f6;
+}
+
 .repo-btn {
   flex-shrink: 0;
   padding: 0.5rem 1rem;
@@ -157,6 +192,17 @@
 
 .repo-btn--primary:hover:not(:disabled) {
   background: #1d4ed8;
+}
+
+.repo-btn--secondary {
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 1rem;
+  padding: 0.4rem 0.7rem;
+}
+
+.repo-btn--secondary:hover:not(:disabled) {
+  background: #e5e7eb;
 }
 
 .repo-btn--danger {

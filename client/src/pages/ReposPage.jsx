@@ -1,24 +1,71 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import api from '../services/api';
 import './ReposPage.css';
 
-function RepoCard({ repo, action, onAction, loading }) {
+function SyncStatus({ status, lastSyncAt }) {
+  if (status === 'running') return <span className="sync-badge sync-badge--running">Syncing…</span>;
+  if (status === 'failed') return <span className="sync-badge sync-badge--failed">Sync failed</span>;
+  if (lastSyncAt) {
+    const d = new Date(lastSyncAt);
+    return (
+      <span className="sync-badge sync-badge--ok">
+        Synced {d.toLocaleDateString()} {d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+      </span>
+    );
+  }
+  return <span className="sync-badge sync-badge--none">Never synced</span>;
+}
+
+function ConnectedRepoCard({ repo, onDisconnect, onSync, disconnecting, syncing }) {
   return (
     <div className="repo-card">
       <div className="repo-card-info">
         <div className="repo-card-header">
-          <span className="repo-name">{repo.fullName || repo.name}</span>
+          <span className="repo-name">{repo.fullName}</span>
+          {repo.private && <span className="repo-badge">Private</span>}
+          {repo.language && <span className="repo-lang">{repo.language}</span>}
+        </div>
+        {repo.description && <p className="repo-desc">{repo.description}</p>}
+        <SyncStatus status={repo.syncStatus} lastSyncAt={repo.lastSyncAt} />
+      </div>
+      <div className="repo-card-actions">
+        <button
+          className="repo-btn repo-btn--secondary"
+          onClick={() => onSync(repo)}
+          disabled={syncing || repo.syncStatus === 'running'}
+          title="Sync now"
+        >
+          {syncing || repo.syncStatus === 'running' ? '…' : '↻'}
+        </button>
+        <button
+          className="repo-btn repo-btn--danger"
+          onClick={() => onDisconnect(repo)}
+          disabled={disconnecting}
+        >
+          Disconnect
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AvailableRepoCard({ repo, onConnect, connecting }) {
+  return (
+    <div className="repo-card">
+      <div className="repo-card-info">
+        <div className="repo-card-header">
+          <span className="repo-name">{repo.fullName}</span>
           {repo.private && <span className="repo-badge">Private</span>}
           {repo.language && <span className="repo-lang">{repo.language}</span>}
         </div>
         {repo.description && <p className="repo-desc">{repo.description}</p>}
       </div>
       <button
-        className={`repo-btn ${action === 'disconnect' ? 'repo-btn--danger' : 'repo-btn--primary'}`}
-        onClick={() => onAction(repo)}
-        disabled={loading}
+        className="repo-btn repo-btn--primary"
+        onClick={() => onConnect(repo)}
+        disabled={connecting}
       >
-        {action === 'connect' ? 'Connect' : 'Disconnect'}
+        Connect
       </button>
     </div>
   );
@@ -30,14 +77,16 @@ function ReposPage() {
   const [loadingConnected, setLoadingConnected] = useState(true);
   const [loadingAvailable, setLoadingAvailable] = useState(true);
   const [actionId, setActionId] = useState(null);
+  const [syncingId, setSyncingId] = useState(null);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const pollRef = useRef(null);
 
   const fetchConnected = useCallback(async () => {
     setLoadingConnected(true);
     try {
       const res = await api.get('/repos');
-      setConnected(res.data);
+      setConnected(res.data.map((r) => ({ ...r, syncStatus: null })));
     } catch {
       setError('Failed to load connected repositories.');
     } finally {
@@ -51,7 +100,6 @@ function ReposPage() {
       const res = await api.get('/repos/available');
       setAvailable(res.data);
     } catch {
-      // Non-fatal — user may not have GitHub connected
       setAvailable([]);
     } finally {
       setLoadingAvailable(false);
@@ -61,7 +109,49 @@ function ReposPage() {
   useEffect(() => {
     fetchConnected();
     fetchAvailable();
+    return () => clearInterval(pollRef.current);
   }, [fetchConnected, fetchAvailable]);
+
+  const updateRepoSyncStatus = (repoId, patch) => {
+    setConnected((prev) =>
+      prev.map((r) => (r.id === repoId ? { ...r, ...patch } : r)),
+    );
+  };
+
+  const pollSyncStatus = (repoId) => {
+    clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await api.get(`/repos/${repoId}/sync-status`);
+        const { latestJob, lastSyncAt } = res.data;
+        if (!latestJob || latestJob.status !== 'running') {
+          clearInterval(pollRef.current);
+          setSyncingId(null);
+          updateRepoSyncStatus(repoId, {
+            syncStatus: latestJob?.status ?? null,
+            lastSyncAt,
+          });
+        }
+      } catch {
+        clearInterval(pollRef.current);
+        setSyncingId(null);
+      }
+    }, 3000);
+  };
+
+  const handleSync = async (repo) => {
+    setSyncingId(repo.id);
+    setError('');
+    updateRepoSyncStatus(repo.id, { syncStatus: 'running' });
+    try {
+      await api.post(`/repos/${repo.id}/sync`);
+      pollSyncStatus(repo.id);
+    } catch (err) {
+      setError(err.message);
+      updateRepoSyncStatus(repo.id, { syncStatus: null });
+      setSyncingId(null);
+    }
+  };
 
   const handleConnect = async (repo) => {
     setActionId(repo.githubId);
@@ -117,12 +207,13 @@ function ReposPage() {
         ) : (
           <div className="repos-list">
             {connected.map((repo) => (
-              <RepoCard
+              <ConnectedRepoCard
                 key={repo.id}
-                repo={{ ...repo, fullName: repo.fullName }}
-                action="disconnect"
-                onAction={handleDisconnect}
-                loading={actionId === repo.id}
+                repo={repo}
+                onDisconnect={handleDisconnect}
+                onSync={handleSync}
+                disconnecting={actionId === repo.id}
+                syncing={syncingId === repo.id}
               />
             ))}
           </div>
@@ -153,12 +244,11 @@ function ReposPage() {
                 <div className="repos-empty">No repositories match your search.</div>
               ) : (
                 filteredAvailable.map((repo) => (
-                  <RepoCard
+                  <AvailableRepoCard
                     key={repo.githubId}
                     repo={repo}
-                    action="connect"
-                    onAction={handleConnect}
-                    loading={actionId === repo.githubId}
+                    onConnect={handleConnect}
+                    connecting={actionId === repo.githubId}
                   />
                 ))
               )}
