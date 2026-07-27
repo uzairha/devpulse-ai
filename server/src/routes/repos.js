@@ -6,6 +6,8 @@ import {
   listAvailableRepos,
   connectRepo,
   listRepos,
+  triggerSync,
+  getSyncStatus,
   disconnectRepo,
 } from '../controllers/repoController.js';
 
@@ -23,6 +25,20 @@ router.post(
 router.get('/available', listAvailableRepos);
 
 router.get('/', listRepos);
+
+router.post(
+  '/:id/sync',
+  [param('id').isUUID().withMessage('Invalid repository id')],
+  validate,
+  triggerSync,
+);
+
+router.get(
+  '/:id/sync-status',
+  [param('id').isUUID().withMessage('Invalid repository id')],
+  validate,
+  getSyncStatus,
+);
 
 router.delete(
   '/:id',

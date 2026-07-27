@@ -1,5 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { getUserRepos } from '../services/githubApiService.js';
+import { syncQueue } from '../lib/queue.js';
 
 export const listAvailableRepos = async (req, res, next) => {
   try {
@@ -78,6 +79,52 @@ export const listRepos = async (req, res, next) => {
       orderBy: { createdAt: 'desc' },
     });
     res.json(repos);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const triggerSync = async (req, res, next) => {
+  try {
+    const repo = await prisma.repository.findUnique({ where: { id: req.params.id } });
+    if (!repo) return res.status(404).json({ error: 'Repository not found' });
+    if (repo.userId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+
+    const running = await prisma.syncJob.findFirst({
+      where: { repositoryId: repo.id, status: 'running' },
+    });
+    if (running) return res.status(409).json({ error: 'A sync is already in progress' });
+
+    await syncQueue.add('sync', { repositoryId: repo.id });
+    res.status(202).json({ message: 'Sync queued' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getSyncStatus = async (req, res, next) => {
+  try {
+    const repo = await prisma.repository.findUnique({ where: { id: req.params.id } });
+    if (!repo) return res.status(404).json({ error: 'Repository not found' });
+    if (repo.userId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+
+    const latestJob = await prisma.syncJob.findFirst({
+      where: { repositoryId: repo.id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      lastSyncAt: repo.lastSyncAt,
+      latestJob: latestJob
+        ? {
+            id: latestJob.id,
+            status: latestJob.status,
+            startedAt: latestJob.startedAt,
+            completedAt: latestJob.completedAt,
+            error: latestJob.error,
+          }
+        : null,
+    });
   } catch (err) {
     next(err);
   }
