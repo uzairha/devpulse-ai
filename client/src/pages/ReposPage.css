@@ -107,6 +107,16 @@
   word-break: break-all;
 }
 
+.repo-name--link {
+  text-decoration: none;
+  color: #111827;
+}
+
+.repo-name--link:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
 .repo-badge {
   font-size: 0.7rem;
   font-weight: 600;

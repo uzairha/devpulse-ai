@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
 import './ReposPage.css';
 
@@ -21,7 +22,7 @@ function ConnectedRepoCard({ repo, onDisconnect, onSync, disconnecting, syncing 
     <div className="repo-card">
       <div className="repo-card-info">
         <div className="repo-card-header">
-          <span className="repo-name">{repo.fullName}</span>
+          <Link to={`/repos/${repo.id}`} className="repo-name repo-name--link">{repo.fullName}</Link>
           {repo.private && <span className="repo-badge">Private</span>}
           {repo.language && <span className="repo-lang">{repo.language}</span>}
         </div>
