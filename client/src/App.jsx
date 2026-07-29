@@ -8,6 +8,9 @@ import RegisterPage from './pages/RegisterPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import DashboardPage from './pages/DashboardPage';
 import ReposPage from './pages/ReposPage';
+import RepoDetailPage from './pages/RepoDetailPage';
+import ReportsPage from './pages/ReportsPage';
+import SettingsPage from './pages/SettingsPage';
 
 function App() {
   const { user, isLoading } = useAuth();
@@ -42,6 +45,36 @@ function App() {
           <ProtectedRoute>
             <Layout>
               <ReposPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/repos/:id"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <RepoDetailPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reports"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ReportsPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <SettingsPage />
             </Layout>
           </ProtectedRoute>
         }
