@@ -5,6 +5,7 @@ import config from './config/index.js';
 import healthRouter from './routes/health.js';
 import authRouter from './routes/auth.js';
 import reposRouter from './routes/repos.js';
+import analyticsRouter from './routes/analytics.js';
 import errorHandler from './middleware/errorHandler.js';
 import { startSyncWorker } from './workers/syncWorker.js';
 
@@ -17,6 +18,7 @@ app.use(morgan('dev'));
 app.use('/api/health', healthRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/repos', reposRouter);
+app.use('/api/analytics', analyticsRouter);
 
 app.use(errorHandler);
 
