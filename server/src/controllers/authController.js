@@ -36,6 +36,20 @@ export const getMe = async (req, res, next) => {
   }
 };
 
+export const updateSettings = async (req, res, next) => {
+  try {
+    const { weeklyReportEmail, syncNotifications } = req.body;
+    const data = {};
+    if (typeof weeklyReportEmail === 'boolean') data.weeklyReportEmail = weeklyReportEmail;
+    if (typeof syncNotifications === 'boolean') data.syncNotifications = syncNotifications;
+
+    const user = await prisma.user.update({ where: { id: req.user.id }, data });
+    res.json(formatUser(user));
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const githubRedirect = (_req, res) => {
   res.redirect(getGithubAuthUrl());
 };

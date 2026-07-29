@@ -49,5 +49,7 @@ export const formatUser = (user) => ({
   email: user.email,
   githubUsername: user.githubUsername,
   githubAvatarUrl: user.githubAvatarUrl,
+  weeklyReportEmail: user.weeklyReportEmail,
+  syncNotifications: user.syncNotifications,
   createdAt: user.createdAt,
 });
