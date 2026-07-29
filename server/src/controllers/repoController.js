@@ -66,6 +66,8 @@ export const connectRepo = async (req, res, next) => {
       },
     });
 
+    await syncQueue.add('sync', { repositoryId: repo.id });
+
     res.status(201).json(repo);
   } catch (err) {
     next(err);
