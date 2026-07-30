@@ -1,5 +1,34 @@
 # Development Log
 
+## Week 2, Day 10 — 2026-07-30
+
+### Tasks Completed
+- [x] Task 46 — Security: helmet headers + express-rate-limit on auth routes
+- [x] Task 47 — PR list table in repo detail page (paginated)
+- [x] Task 48 — Commit list table in repo detail page (paginated)
+- [x] Task 49 — GET /api/analytics/:id/prs + /commits endpoints with pagination
+- [x] Task 50 — Week 2 documentation update
+
+### Week 2 Summary
+All 25 tasks complete (Tasks 26–50). Full GitHub sync pipeline + analytics layer built:
+- GitHub API service with full pagination (@octokit/rest)
+- Repo connect/list/disconnect with auto-sync on connect
+- BullMQ + Redis background sync worker (PRs + commits)
+- Analytics service: PR metrics, commit metrics, daily activity
+- Dashboard with metric cards and commit chart
+- Repo detail page with tabbed Overview / Pull Requests / Commits
+- Settings page, Reports placeholder
+- Security: helmet, rate limiting on auth routes
+
+### Next: Week 3 — AI Features (Tasks 51–75)
+- Task 51: OpenAI API integration
+- Task 52: PR summary generation
+- Task 53: Weekly report generation
+- Task 54: Repository health score
+- Task 55: AI chat endpoint
+
+---
+
 ## Week 1, Day 5 — 2026-07-25
 
 ### Tasks Completed
