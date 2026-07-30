@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { param, query } from 'express-validator';
 import requireAuth from '../middleware/requireAuth.js';
 import validate from '../middleware/validate.js';
-import { getRepoAnalytics } from '../controllers/analyticsController.js';
+import { getRepoAnalytics, listPullRequests, listCommits } from '../controllers/analyticsController.js';
 
 const router = Router();
 
@@ -17,5 +17,14 @@ router.get(
   validate,
   getRepoAnalytics,
 );
+
+const paginationRules = (id) => [
+  param(id).isUUID().withMessage('Invalid repository id'),
+  query('page').optional().isInt({ min: 1 }),
+  query('limit').optional().isInt({ min: 1, max: 100 }),
+];
+
+router.get('/:id/prs', paginationRules('id'), validate, listPullRequests);
+router.get('/:id/commits', paginationRules('id'), validate, listCommits);
 
 export default router;
