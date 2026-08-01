@@ -54,6 +54,55 @@ function Pagination({ page, pages, onPage }) {
   );
 }
 
+function PrRow({ pr }) {
+  const [summary, setSummary] = useState(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  const handleSummarize = async () => {
+    if (summary) { setExpanded((v) => !v); return; }
+    setLoadingSummary(true);
+    try {
+      const res = await api.post('/ai/pr-summary', { prId: pr.id });
+      setSummary(res.data.summary);
+      setExpanded(true);
+    } catch {
+      setSummary('Failed to generate summary.');
+      setExpanded(true);
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
+  return (
+    <>
+      <tr>
+        <td className="col-num">#{pr.number}</td>
+        <td className="col-title">{pr.title}</td>
+        <td className="col-author">{pr.authorLogin}</td>
+        <td><PrStatebage state={pr.state} mergedAt={pr.mergedAt} /></td>
+        <td className="col-diff">
+          <span className="add">+{pr.additions}</span>{' '}
+          <span className="del">-{pr.deletions}</span>
+        </td>
+        <td className="col-date">{new Date(pr.createdAt).toLocaleDateString()}</td>
+        <td>
+          <button className="summarize-btn" onClick={handleSummarize} disabled={loadingSummary}>
+            {loadingSummary ? '…' : summary ? (expanded ? '▲' : '▼') : '✦ AI'}
+          </button>
+        </td>
+      </tr>
+      {expanded && summary && (
+        <tr className="summary-row">
+          <td colSpan={7}>
+            <div className="pr-summary">{summary}</div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
 function PrTable({ repoId }) {
   const [data, setData] = useState(null);
   const [page, setPage] = useState(1);
@@ -83,22 +132,11 @@ function PrTable({ repoId }) {
               <th>State</th>
               <th>+/-</th>
               <th>Created</th>
+              <th>AI</th>
             </tr>
           </thead>
           <tbody>
-            {data.data.map((pr) => (
-              <tr key={pr.id}>
-                <td className="col-num">#{pr.number}</td>
-                <td className="col-title">{pr.title}</td>
-                <td className="col-author">{pr.authorLogin}</td>
-                <td><PrStatebage state={pr.state} mergedAt={pr.mergedAt} /></td>
-                <td className="col-diff">
-                  <span className="add">+{pr.additions}</span>{' '}
-                  <span className="del">-{pr.deletions}</span>
-                </td>
-                <td className="col-date">{new Date(pr.createdAt).toLocaleDateString()}</td>
-              </tr>
-            ))}
+            {data.data.map((pr) => <PrRow key={pr.id} pr={pr} />)}
           </tbody>
         </table>
       </div>
@@ -163,6 +201,37 @@ function PrStatebage({ state, mergedAt }) {
   if (mergedAt) return <span className="pr-badge pr-badge--merged">Merged</span>;
   if (state === 'open') return <span className="pr-badge pr-badge--open">Open</span>;
   return <span className="pr-badge pr-badge--closed">Closed</span>;
+}
+
+function HealthScoreCard({ repoId }) {
+  const [health, setHealth] = useState(null);
+
+  useEffect(() => {
+    api.get(`/ai/health-score/${repoId}`).then((res) => setHealth(res.data)).catch(() => {});
+  }, [repoId]);
+
+  if (!health) return null;
+
+  const color = health.score >= 75 ? '#15803d' : health.score >= 50 ? '#d97706' : '#b91c1c';
+  const bg    = health.score >= 75 ? '#f0fdf4' : health.score >= 50 ? '#fffbeb' : '#fef2f2';
+  const border= health.score >= 75 ? '#bbf7d0' : health.score >= 50 ? '#fde68a' : '#fecaca';
+
+  return (
+    <div className="health-card" style={{ background: bg, borderColor: border }}>
+      <div className="health-score" style={{ color }}>{health.score}</div>
+      <div className="health-label">Health Score</div>
+      <div className="health-breakdown">
+        {Object.entries(health.breakdown).map(([k, v]) => (
+          <div key={k} className="health-item">
+            <span className="health-item-label">
+              {k.replace(/([A-Z])/g, ' $1').toLowerCase()}
+            </span>
+            <span className="health-item-val">{v}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function RepoDetailPage() {
@@ -232,6 +301,8 @@ function RepoDetailPage() {
 
           {activeTab === 'overview' && (
             <>
+              <HealthScoreCard repoId={id} />
+
               <section className="dash-section">
                 <h2 className="dash-section-title">Pull Requests</h2>
                 <div className="metrics-grid">

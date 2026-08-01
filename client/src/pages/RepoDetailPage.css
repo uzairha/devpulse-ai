@@ -160,3 +160,91 @@
   border: 1px solid #e5e7eb;
   border-radius: 10px;
 }
+
+/* Health score card */
+.health-card {
+  border: 1px solid;
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.health-score {
+  font-size: 3rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.health-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 0.25rem;
+}
+
+.health-breakdown {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.health-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.health-item-label {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  text-transform: capitalize;
+}
+
+.health-item-val {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+/* AI summary */
+.summarize-btn {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid #e5e7eb;
+  border-radius: 5px;
+  background: white;
+  cursor: pointer;
+  color: #6b7280;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.summarize-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: #2563eb;
+  border-color: #2563eb;
+}
+
+.summarize-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.summary-row td {
+  background: #f8faff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.pr-summary {
+  font-size: 0.82rem;
+  color: #374151;
+  line-height: 1.6;
+  padding: 0.25rem 0;
+}
