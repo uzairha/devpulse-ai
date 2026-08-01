@@ -7,6 +7,12 @@ const config = {
   jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-in-production',
   databaseUrl: process.env.DATABASE_URL,
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+  github: {
+    clientId: process.env.GITHUB_CLIENT_ID,
+    clientSecret: process.env.GITHUB_CLIENT_SECRET,
+    callbackUrl: process.env.GITHUB_CALLBACK_URL || 'http://localhost:3001/api/auth/github/callback',
+  },
+  openaiApiKey: process.env.OPENAI_API_KEY,
 };
 
 export default config;
