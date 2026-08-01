@@ -8,6 +8,7 @@ import healthRouter from './routes/health.js';
 import authRouter from './routes/auth.js';
 import reposRouter from './routes/repos.js';
 import analyticsRouter from './routes/analytics.js';
+import aiRouter from './routes/ai.js';
 import errorHandler from './middleware/errorHandler.js';
 import { startSyncWorker } from './workers/syncWorker.js';
 
@@ -30,6 +31,7 @@ app.use('/api/health', healthRouter);
 app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/repos', reposRouter);
 app.use('/api/analytics', analyticsRouter);
+app.use('/api/ai', aiRouter);
 
 app.use(errorHandler);
 
