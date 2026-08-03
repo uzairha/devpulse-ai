@@ -196,6 +196,68 @@ function CommitTable({ repoId }) {
   );
 }
 
+function ChatPanel({ repoId }) {
+  const [messages, setMessages] = useState([
+    { role: 'assistant', content: 'Ask me anything about this repository — PRs, commits, contributors, trends.' },
+  ]);
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const bottomRef = useState(null);
+
+  const handleSend = async () => {
+    const text = input.trim();
+    if (!text || sending) return;
+    const history = messages.filter((m) => m.role !== 'assistant' || messages.indexOf(m) > 0);
+    const next = [...messages, { role: 'user', content: text }];
+    setMessages(next);
+    setInput('');
+    setSending(true);
+    try {
+      const res = await api.post(`/ai/chat/${repoId}`, { message: text, history });
+      setMessages([...next, { role: 'assistant', content: res.data.reply }]);
+    } catch {
+      setMessages([...next, { role: 'assistant', content: 'Sorry, something went wrong. Try again.' }]);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleKey = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  };
+
+  return (
+    <div className="chat-panel">
+      <div className="chat-messages">
+        {messages.map((m, i) => (
+          <div key={i} className={`chat-msg chat-msg--${m.role}`}>
+            <span className="chat-bubble">{m.content}</span>
+          </div>
+        ))}
+        {sending && (
+          <div className="chat-msg chat-msg--assistant">
+            <span className="chat-bubble chat-thinking">Thinking…</span>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+      <div className="chat-input-row">
+        <input
+          className="chat-input"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKey}
+          placeholder="Ask about this repo…"
+          disabled={sending}
+        />
+        <button className="chat-send-btn" onClick={handleSend} disabled={sending || !input.trim()}>
+          Send
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // Fix typo in PrStatebage -> PrStatebage kept for render consistency
 function PrStatebage({ state, mergedAt }) {
   if (mergedAt) return <span className="pr-badge pr-badge--merged">Merged</span>;
@@ -276,7 +338,7 @@ function RepoDetailPage() {
       </div>
 
       <div className="detail-tabs">
-        {['overview', 'pull requests', 'commits'].map((tab) => (
+        {['overview', 'pull requests', 'commits', 'chat'].map((tab) => (
           <button
             key={tab}
             className={`detail-tab ${activeTab === tab ? 'active' : ''}`}
@@ -356,6 +418,13 @@ function RepoDetailPage() {
             <section className="dash-section">
               <h2 className="dash-section-title">Commits</h2>
               <CommitTable repoId={id} />
+            </section>
+          )}
+
+          {activeTab === 'chat' && (
+            <section className="dash-section">
+              <h2 className="dash-section-title">AI Chat</h2>
+              <ChatPanel repoId={id} />
             </section>
           )}
         </>
