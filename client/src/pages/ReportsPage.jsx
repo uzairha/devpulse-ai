@@ -1,27 +1,103 @@
+import { useEffect, useState } from 'react';
+import api from '../services/api';
 import './ReportsPage.css';
 
 function ReportsPage() {
+  const [repos, setRepos] = useState([]);
+  const [selectedId, setSelectedId] = useState('');
+  const [report, setReport] = useState(null);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.get('/repos').then((res) => {
+      setRepos(res.data);
+      if (res.data.length > 0) setSelectedId(res.data[0].id);
+    });
+  }, []);
+
+  const handleGenerate = async () => {
+    if (!selectedId) return;
+    setGenerating(true);
+    setError('');
+    setReport(null);
+    try {
+      const res = await api.post(`/ai/weekly-report/${selectedId}`);
+      setReport(res.data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   return (
     <div className="reports-page">
       <div className="reports-header">
-        <h1 className="reports-title">Reports</h1>
-        <p className="reports-subtitle">AI-generated weekly engineering reports — coming in Week 3.</p>
-      </div>
-
-      <div className="reports-coming-soon">
-        <div className="coming-soon-icon">◈</div>
-        <h2 className="coming-soon-title">AI Reports</h2>
-        <p className="coming-soon-desc">
-          Weekly summaries, PR health scores, and natural-language insights about your team's
-          engineering velocity will appear here once your repositories are synced.
-        </p>
-        <div className="coming-soon-features">
-          <div className="coming-soon-feature">Weekly engineering digest</div>
-          <div className="coming-soon-feature">PR health score (0–100)</div>
-          <div className="coming-soon-feature">Contributor spotlight</div>
-          <div className="coming-soon-feature">Trend analysis</div>
+        <div>
+          <h1 className="reports-title">Reports</h1>
+          <p className="reports-subtitle">AI-generated weekly engineering digests.</p>
         </div>
       </div>
+
+      {repos.length === 0 ? (
+        <div className="reports-empty">
+          No repositories connected. Go to <a href="/repos">Repositories</a> to connect one first.
+        </div>
+      ) : (
+        <>
+          <div className="reports-controls">
+            <select
+              className="reports-select"
+              value={selectedId}
+              onChange={(e) => { setSelectedId(e.target.value); setReport(null); }}
+            >
+              {repos.map((r) => (
+                <option key={r.id} value={r.id}>{r.fullName}</option>
+              ))}
+            </select>
+            <button
+              className="reports-generate-btn"
+              onClick={handleGenerate}
+              disabled={generating || !selectedId}
+            >
+              {generating ? 'Generating…' : '✦ Generate weekly report'}
+            </button>
+          </div>
+
+          {error && <div className="reports-error">{error}</div>}
+
+          {generating && (
+            <div className="reports-generating">
+              <div className="generating-spinner" />
+              Asking GPT-4o-mini to summarise the last 7 days…
+            </div>
+          )}
+
+          {report && (
+            <div className="report-card">
+              <div className="report-meta">
+                <span className="report-repo">{report.repoFullName}</span>
+                <span className="report-date">
+                  Generated {new Date(report.generatedAt).toLocaleString()}
+                </span>
+              </div>
+              <div className="report-body">
+                {report.report.split('\n\n').map((para, i) => (
+                  <p key={i}>{para}</p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!report && !generating && (
+            <div className="reports-placeholder">
+              <div className="placeholder-icon">◈</div>
+              <p>Select a repository and click <strong>Generate weekly report</strong> to get an AI digest of the last 7 days of activity.</p>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
