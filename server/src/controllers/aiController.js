@@ -1,5 +1,5 @@
 import prisma from '../lib/prisma.js';
-import { generatePrSummary, calculateHealthScore } from '../services/aiService.js';
+import { generatePrSummary, calculateHealthScore, generateWeeklyReport, chatWithRepoData } from '../services/aiService.js';
 
 export const summarizePr = async (req, res, next) => {
   try {
@@ -15,6 +15,33 @@ export const summarizePr = async (req, res, next) => {
 
     const summary = await generatePrSummary(pr);
     res.json({ summary });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const weeklyReport = async (req, res, next) => {
+  try {
+    const repo = await prisma.repository.findUnique({ where: { id: req.params.id } });
+    if (!repo) return res.status(404).json({ error: 'Repository not found' });
+    if (repo.userId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+
+    const report = await generateWeeklyReport(repo.id);
+    res.json({ report, generatedAt: new Date(), repoFullName: repo.fullName });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const chat = async (req, res, next) => {
+  try {
+    const repo = await prisma.repository.findUnique({ where: { id: req.params.id } });
+    if (!repo) return res.status(404).json({ error: 'Repository not found' });
+    if (repo.userId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+
+    const { message, history = [] } = req.body;
+    const reply = await chatWithRepoData(repo.id, message, history);
+    res.json({ reply });
   } catch (err) {
     next(err);
   }
