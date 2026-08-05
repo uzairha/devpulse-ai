@@ -1,6 +1,7 @@
 import { Worker } from 'bullmq';
 import prisma from '../lib/prisma.js';
 import { getRepoPullRequests, getRepoCommits } from '../services/githubApiService.js';
+import { createNotification } from '../services/notificationService.js';
 import config from '../config/index.js';
 import logger from '../lib/logger.js';
 
@@ -11,7 +12,7 @@ const processSync = async (job) => {
 
   const repo = await prisma.repository.findUnique({
     where: { id: repositoryId },
-    include: { user: { select: { githubAccessToken: true } } },
+    include: { user: { select: { id: true, githubAccessToken: true, syncNotifications: true } } },
   });
 
   if (!repo) throw new Error(`Repository ${repositoryId} not found`);
@@ -96,11 +97,28 @@ const processSync = async (job) => {
     });
 
     logger.info(`Sync completed for ${repo.fullName}: ${prs.length} PRs, ${commits.length} commits`);
+
+    if (repo.user.syncNotifications) {
+      await createNotification(repo.user.id, {
+        type: 'sync_complete',
+        title: 'Sync complete',
+        body: `${repo.fullName} synced — ${prs.length} PRs and ${commits.length} commits imported.`,
+      });
+    }
   } catch (err) {
     await prisma.syncJob.update({
       where: { id: syncJob.id },
       data: { status: 'failed', completedAt: new Date(), error: err.message },
     });
+
+    if (repo.user.syncNotifications) {
+      await createNotification(repo.user.id, {
+        type: 'sync_failed',
+        title: 'Sync failed',
+        body: `${repo.fullName} sync failed: ${err.message}`,
+      }).catch(() => {});
+    }
+
     throw err;
   }
 };
