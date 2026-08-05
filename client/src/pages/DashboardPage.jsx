@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../services/api';
+import { MetricsGridSkeleton } from '../components/Skeleton';
 import './DashboardPage.css';
 
 const DAYS_OPTIONS = [7, 30, 90];
@@ -108,7 +109,9 @@ function DashboardPage() {
       ) : error ? (
         <div className="dashboard-error">{error}</div>
       ) : loading ? (
-        <div className="dashboard-loading">Loading analytics…</div>
+        <div>
+          <MetricsGridSkeleton count={6} />
+        </div>
       ) : !analytics ? null : (
         <>
           {!analytics.repo.lastSyncAt && (
