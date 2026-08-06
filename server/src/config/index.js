@@ -11,7 +11,9 @@ const config = {
     clientId: process.env.GITHUB_CLIENT_ID,
     clientSecret: process.env.GITHUB_CLIENT_SECRET,
     callbackUrl: process.env.GITHUB_CALLBACK_URL || 'http://localhost:3001/api/auth/github/callback',
+    webhookSecret: process.env.GITHUB_WEBHOOK_SECRET,
   },
+  webhookBaseUrl: process.env.WEBHOOK_BASE_URL || 'http://localhost:3001',
   openaiApiKey: process.env.OPENAI_API_KEY,
 };
 

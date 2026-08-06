@@ -37,3 +37,24 @@ export const getRepoCommits = async (accessToken, owner, repo) => {
     throw err;
   }
 };
+
+export const createRepoWebhook = async (accessToken, owner, repo, webhookUrl, secret) => {
+  const octokit = getClient(accessToken);
+  const { data } = await octokit.repos.createWebhook({
+    owner,
+    repo,
+    config: {
+      url: webhookUrl,
+      content_type: 'json',
+      secret,
+    },
+    events: ['push'],
+    active: true,
+  });
+  return data.id;
+};
+
+export const deleteRepoWebhook = async (accessToken, owner, repo, hookId) => {
+  const octokit = getClient(accessToken);
+  await octokit.repos.deleteWebhook({ owner, repo, hook_id: hookId });
+};

@@ -36,6 +36,7 @@ model Repository {
   private     Boolean   @default(false)
   syncEnabled Boolean   @default(true)
   lastSyncAt  DateTime?
+  webhookId   Int?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

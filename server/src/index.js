@@ -10,6 +10,7 @@ import reposRouter from './routes/repos.js';
 import analyticsRouter from './routes/analytics.js';
 import aiRouter from './routes/ai.js';
 import notificationsRouter from './routes/notifications.js';
+import webhooksRouter from './routes/webhooks.js';
 import errorHandler from './middleware/errorHandler.js';
 import { startSyncWorker } from './workers/syncWorker.js';
 
@@ -17,6 +18,9 @@ const app = express();
 
 app.use(helmet());
 app.use(cors({ origin: config.clientUrl }));
+// Webhook signature verification needs the raw request body, so this must be
+// parsed before the global JSON parser consumes the stream.
+app.use('/api/webhooks/github', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(morgan('dev'));
 
@@ -43,6 +47,7 @@ app.use('/api/repos', reposRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/ai', aiLimiter, aiRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/webhooks', webhooksRouter);
 
 app.use(errorHandler);
 

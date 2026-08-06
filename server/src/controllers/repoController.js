@@ -1,6 +1,8 @@
 import prisma from '../lib/prisma.js';
-import { getUserRepos } from '../services/githubApiService.js';
+import { getUserRepos, createRepoWebhook, deleteRepoWebhook } from '../services/githubApiService.js';
 import { syncQueue } from '../lib/queue.js';
+import config from '../config/index.js';
+import logger from '../lib/logger.js';
 
 export const listAvailableRepos = async (req, res, next) => {
   try {
@@ -67,6 +69,22 @@ export const connectRepo = async (req, res, next) => {
     });
 
     await syncQueue.add('sync', { repositoryId: repo.id });
+
+    if (config.github.webhookSecret) {
+      const [owner, repoName] = ghRepo.full_name.split('/');
+      try {
+        const webhookId = await createRepoWebhook(
+          user.githubAccessToken,
+          owner,
+          repoName,
+          `${config.webhookBaseUrl}/api/webhooks/github`,
+          config.github.webhookSecret,
+        );
+        await prisma.repository.update({ where: { id: repo.id }, data: { webhookId } });
+      } catch (err) {
+        logger.warn(`Could not register webhook for ${ghRepo.full_name}: ${err.message}`);
+      }
+    }
 
     res.status(201).json(repo);
   } catch (err) {
@@ -137,6 +155,16 @@ export const disconnectRepo = async (req, res, next) => {
     const repo = await prisma.repository.findUnique({ where: { id: req.params.id } });
     if (!repo) return res.status(404).json({ error: 'Repository not found' });
     if (repo.userId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+
+    if (repo.webhookId) {
+      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+      const [owner, repoName] = repo.fullName.split('/');
+      try {
+        await deleteRepoWebhook(user.githubAccessToken, owner, repoName, repo.webhookId);
+      } catch (err) {
+        logger.warn(`Could not remove webhook for ${repo.fullName}: ${err.message}`);
+      }
+    }
 
     await prisma.repository.delete({ where: { id: req.params.id } });
     res.status(204).send();
