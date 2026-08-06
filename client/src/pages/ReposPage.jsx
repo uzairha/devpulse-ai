@@ -27,7 +27,14 @@ function ConnectedRepoCard({ repo, onDisconnect, onSync, disconnecting, syncing 
           {repo.language && <span className="repo-lang">{repo.language}</span>}
         </div>
         {repo.description && <p className="repo-desc">{repo.description}</p>}
-        <SyncStatus status={repo.syncStatus} lastSyncAt={repo.lastSyncAt} />
+        <div className="repo-status-row">
+          <SyncStatus status={repo.syncStatus} lastSyncAt={repo.lastSyncAt} />
+          {repo.webhookId && (
+            <span className="sync-badge sync-badge--webhook" title="Auto-syncs on GitHub push">
+              ⚡ Auto-sync
+            </span>
+          )}
+        </div>
       </div>
       <div className="repo-card-actions">
         <button
