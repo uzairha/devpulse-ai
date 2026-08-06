@@ -24,7 +24,12 @@ const paginationRules = (id) => [
   query('limit').optional().isInt({ min: 1, max: 100 }),
 ];
 
-router.get('/:id/prs', paginationRules('id'), validate, listPullRequests);
+router.get(
+  '/:id/prs',
+  [...paginationRules('id'), query('state').optional().isIn(['open', 'closed', 'merged'])],
+  validate,
+  listPullRequests,
+);
 router.get('/:id/commits', paginationRules('id'), validate, listCommits);
 
 export default router;

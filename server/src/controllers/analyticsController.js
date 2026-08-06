@@ -29,10 +29,16 @@ export const listPullRequests = async (req, res, next) => {
     const page = Math.max(parseInt(req.query.page) || 1, 1);
     const limit = Math.min(parseInt(req.query.limit) || 25, 100);
     const skip = (page - 1) * limit;
+    const stateFilter = req.query.state;
+
+    const where = { repositoryId: repo.id };
+    if (stateFilter === 'open') where.state = 'open';
+    else if (stateFilter === 'closed') where.state = 'closed';
+    else if (stateFilter === 'merged') where.mergedAt = { not: null };
 
     const [prs, total] = await Promise.all([
       prisma.pullRequest.findMany({
-        where: { repositoryId: repo.id },
+        where,
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
@@ -44,7 +50,7 @@ export const listPullRequests = async (req, res, next) => {
           reviewCount: true, commentCount: true,
         },
       }),
-      prisma.pullRequest.count({ where: { repositoryId: repo.id } }),
+      prisma.pullRequest.count({ where }),
     ]);
 
     res.json({ data: prs, total, page, limit, pages: Math.ceil(total / limit) });
