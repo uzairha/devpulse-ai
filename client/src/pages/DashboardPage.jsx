@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import api from '../services/api';
+import useAuth from '../hooks/useAuth';
 import { MetricsGridSkeleton } from '../components/Skeleton';
+import OnboardingSteps from '../components/OnboardingSteps';
 import './DashboardPage.css';
 
 const DAYS_OPTIONS = [7, 30, 90];
@@ -42,6 +44,7 @@ function ActivityChart({ data }) {
 }
 
 function DashboardPage() {
+  const { user } = useAuth();
   const [repos, setRepos] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [days, setDays] = useState(30);
@@ -102,10 +105,7 @@ function DashboardPage() {
       </div>
 
       {repos.length === 0 ? (
-        <div className="dashboard-empty">
-          No repositories connected. Go to{' '}
-          <a href="/repos">Repositories</a> to connect one and run a sync.
-        </div>
+        <OnboardingSteps hasGithub={!!user?.githubUsername} hasRepos={false} />
       ) : error ? (
         <div className="dashboard-error">{error}</div>
       ) : loading ? (
