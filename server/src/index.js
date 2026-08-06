@@ -9,6 +9,7 @@ import authRouter from './routes/auth.js';
 import reposRouter from './routes/repos.js';
 import analyticsRouter from './routes/analytics.js';
 import aiRouter from './routes/ai.js';
+import notificationsRouter from './routes/notifications.js';
 import errorHandler from './middleware/errorHandler.js';
 import { startSyncWorker } from './workers/syncWorker.js';
 
@@ -27,11 +28,21 @@ const authLimiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' },
 });
 
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.headers.authorization || req.ip,
+  message: { error: 'AI rate limit reached. Please wait a moment before trying again.' },
+});
+
 app.use('/api/health', healthRouter);
 app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/repos', reposRouter);
 app.use('/api/analytics', analyticsRouter);
-app.use('/api/ai', aiRouter);
+app.use('/api/ai', aiLimiter, aiRouter);
+app.use('/api/notifications', notificationsRouter);
 
 app.use(errorHandler);
 
