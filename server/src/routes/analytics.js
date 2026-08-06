@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { param, query } from 'express-validator';
 import requireAuth from '../middleware/requireAuth.js';
 import validate from '../middleware/validate.js';
-import { getRepoAnalytics, listPullRequests, listCommits } from '../controllers/analyticsController.js';
+import { getRepoAnalytics, listPullRequests, listCommits, getContributor } from '../controllers/analyticsController.js';
 
 const router = Router();
 
@@ -26,10 +26,30 @@ const paginationRules = (id) => [
 
 router.get(
   '/:id/prs',
-  [...paginationRules('id'), query('state').optional().isIn(['open', 'closed', 'merged'])],
+  [
+    ...paginationRules('id'),
+    query('state').optional().isIn(['open', 'closed', 'merged']),
+    query('author').optional().isString().trim().notEmpty(),
+  ],
   validate,
   listPullRequests,
 );
-router.get('/:id/commits', paginationRules('id'), validate, listCommits);
+router.get(
+  '/:id/commits',
+  [...paginationRules('id'), query('author').optional().isString().trim().notEmpty()],
+  validate,
+  listCommits,
+);
+
+router.get(
+  '/:id/contributors/:login',
+  [
+    param('id').isUUID().withMessage('Invalid repository id'),
+    param('login').isString().trim().notEmpty(),
+    query('days').optional().isInt({ min: 1, max: 365 }).withMessage('days must be 1–365'),
+  ],
+  validate,
+  getContributor,
+);
 
 export default router;

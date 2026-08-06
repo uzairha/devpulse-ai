@@ -1,6 +1,7 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../services/api';
+import { PrTable, CommitTable } from '../components/RepoTables';
 import './DashboardPage.css';
 import './RepoDetailPage.css';
 
@@ -34,186 +35,6 @@ function ActivityChart({ data }) {
         <span>{visible[visible.length - 1]?.date.slice(5)}</span>
       </div>
     </div>
-  );
-}
-
-function PrStatebadge({ state, mergedAt }) {
-  if (mergedAt) return <span className="pr-badge pr-badge--merged">Merged</span>;
-  if (state === 'open') return <span className="pr-badge pr-badge--open">Open</span>;
-  return <span className="pr-badge pr-badge--closed">Closed</span>;
-}
-
-function Pagination({ page, pages, onPage }) {
-  if (pages <= 1) return null;
-  return (
-    <div className="pagination">
-      <button className="page-btn" onClick={() => onPage(page - 1)} disabled={page <= 1}>←</button>
-      <span className="page-info">Page {page} of {pages}</span>
-      <button className="page-btn" onClick={() => onPage(page + 1)} disabled={page >= pages}>→</button>
-    </div>
-  );
-}
-
-function PrRow({ pr }) {
-  const [summary, setSummary] = useState(null);
-  const [loadingSummary, setLoadingSummary] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-
-  const handleSummarize = async () => {
-    if (summary) { setExpanded((v) => !v); return; }
-    setLoadingSummary(true);
-    try {
-      const res = await api.post('/ai/pr-summary', { prId: pr.id });
-      setSummary(res.data.summary);
-      setExpanded(true);
-    } catch {
-      setSummary('Failed to generate summary.');
-      setExpanded(true);
-    } finally {
-      setLoadingSummary(false);
-    }
-  };
-
-  return (
-    <>
-      <tr>
-        <td className="col-num">#{pr.number}</td>
-        <td className="col-title">{pr.title}</td>
-        <td className="col-author">{pr.authorLogin}</td>
-        <td><PrStatebage state={pr.state} mergedAt={pr.mergedAt} /></td>
-        <td className="col-diff">
-          <span className="add">+{pr.additions}</span>{' '}
-          <span className="del">-{pr.deletions}</span>
-        </td>
-        <td className="col-date">{new Date(pr.createdAt).toLocaleDateString()}</td>
-        <td>
-          <button className="summarize-btn" onClick={handleSummarize} disabled={loadingSummary}>
-            {loadingSummary ? '…' : summary ? (expanded ? '▲' : '▼') : '✦ AI'}
-          </button>
-        </td>
-      </tr>
-      {expanded && summary && (
-        <tr className="summary-row">
-          <td colSpan={7}>
-            <div className="pr-summary">{summary}</div>
-          </td>
-        </tr>
-      )}
-    </>
-  );
-}
-
-const PR_STATES = ['all', 'open', 'merged', 'closed'];
-
-function PrTable({ repoId }) {
-  const [data, setData] = useState(null);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [stateFilter, setStateFilter] = useState('all');
-
-  const fetch = useCallback((p, state) => {
-    setLoading(true);
-    const stateParam = state !== 'all' ? `&state=${state}` : '';
-    api.get(`/analytics/${repoId}/prs?page=${p}&limit=25${stateParam}`)
-      .then((res) => { setData(res.data); setPage(p); })
-      .finally(() => setLoading(false));
-  }, [repoId]);
-
-  useEffect(() => { fetch(1, stateFilter); }, [fetch, stateFilter]);
-
-  const handleStateChange = (s) => { setStateFilter(s); fetch(1, s); };
-
-  if (loading && !data) return <div className="table-loading">Loading…</div>;
-
-  return (
-    <>
-      <div className="pr-filter-tabs">
-        {PR_STATES.map((s) => (
-          <button
-            key={s}
-            className={`pr-filter-tab ${stateFilter === s ? 'active' : ''}`}
-            onClick={() => handleStateChange(s)}
-          >
-            {s.charAt(0).toUpperCase() + s.slice(1)}
-          </button>
-        ))}
-      </div>
-
-      {!data?.total ? (
-        <div className="table-empty">No pull requests found{stateFilter !== 'all' ? ` with state "${stateFilter}"` : ''}.</div>
-      ) : null}
-
-      {data?.total > 0 && <div className="data-table-wrap">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Title</th>
-              <th>Author</th>
-              <th>State</th>
-              <th>+/-</th>
-              <th>Created</th>
-              <th>AI</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.data.map((pr) => <PrRow key={pr.id} pr={pr} />)}
-          </tbody>
-        </table>
-      </div>}
-      {data?.total > 0 && <Pagination page={page} pages={data.pages} onPage={(p) => fetch(p, stateFilter)} />}
-    </>
-  );
-}
-
-function CommitTable({ repoId }) {
-  const [data, setData] = useState(null);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-
-  const fetch = useCallback((p) => {
-    setLoading(true);
-    api.get(`/analytics/${repoId}/commits?page=${p}&limit=25`)
-      .then((res) => { setData(res.data); setPage(p); })
-      .finally(() => setLoading(false));
-  }, [repoId]);
-
-  useEffect(() => { fetch(1); }, [fetch]);
-
-  if (loading && !data) return <div className="table-loading">Loading…</div>;
-  if (!data?.total) return <div className="table-empty">No commits found. Run a sync first.</div>;
-
-  return (
-    <>
-      <div className="data-table-wrap">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>SHA</th>
-              <th>Message</th>
-              <th>Author</th>
-              <th>+/-</th>
-              <th>Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.data.map((c) => (
-              <tr key={c.id}>
-                <td className="col-sha">{c.sha.slice(0, 7)}</td>
-                <td className="col-title">{c.message.split('\n')[0].slice(0, 72)}</td>
-                <td className="col-author">{c.authorLogin ?? '—'}</td>
-                <td className="col-diff">
-                  <span className="add">+{c.additions}</span>{' '}
-                  <span className="del">-{c.deletions}</span>
-                </td>
-                <td className="col-date">{new Date(c.committedAt).toLocaleDateString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <Pagination page={page} pages={data.pages} onPage={fetch} />
-    </>
   );
 }
 
@@ -277,13 +98,6 @@ function ChatPanel({ repoId }) {
       </div>
     </div>
   );
-}
-
-// Fix typo in PrStatebage -> PrStatebage kept for render consistency
-function PrStatebage({ state, mergedAt }) {
-  if (mergedAt) return <span className="pr-badge pr-badge--merged">Merged</span>;
-  if (state === 'open') return <span className="pr-badge pr-badge--open">Open</span>;
-  return <span className="pr-badge pr-badge--closed">Closed</span>;
 }
 
 function HealthScoreCard({ repoId }) {
@@ -430,10 +244,14 @@ function RepoDetailPage() {
                     <h3 className="contributors-title">Top Contributors</h3>
                     <div className="contributors-list">
                       {cm.topContributors.map((c) => (
-                        <div key={c.login} className="contributor-row">
+                        <Link
+                          key={c.login}
+                          to={`/repos/${id}/contributors/${encodeURIComponent(c.login)}`}
+                          className="contributor-row contributor-row--link"
+                        >
                           <span className="contributor-login">{c.login}</span>
                           <span className="contributor-count">{c.count} commits</span>
-                        </div>
+                        </Link>
                       ))}
                     </div>
                   </div>

@@ -9,6 +9,7 @@ import AuthCallbackPage from './pages/AuthCallbackPage';
 import DashboardPage from './pages/DashboardPage';
 import ReposPage from './pages/ReposPage';
 import RepoDetailPage from './pages/RepoDetailPage';
+import ContributorDetailPage from './pages/ContributorDetailPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 
@@ -55,6 +56,16 @@ function App() {
           <ProtectedRoute>
             <Layout>
               <RepoDetailPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/repos/:id/contributors/:login"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ContributorDetailPage />
             </Layout>
           </ProtectedRoute>
         }

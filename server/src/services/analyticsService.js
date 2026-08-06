@@ -111,6 +111,41 @@ export const getCommitMetrics = async (repositoryId, days = 30) => {
   };
 };
 
+export const getContributorSummary = async (repositoryId, login, days = 30) => {
+  const since = getDaysAgo(days);
+
+  const [prs, commits] = await Promise.all([
+    prisma.pullRequest.findMany({
+      where: { repositoryId, authorLogin: login, createdAt: { gte: since } },
+      select: { mergedAt: true, createdAt: true, additions: true, deletions: true },
+    }),
+    prisma.commit.findMany({
+      where: { repositoryId, authorLogin: login, committedAt: { gte: since } },
+      select: { additions: true, deletions: true },
+    }),
+  ]);
+
+  const merged = prs.filter((p) => p.mergedAt);
+  const mergeTimes = merged
+    .map((p) => new Date(p.mergedAt) - new Date(p.createdAt))
+    .filter((ms) => ms > 0);
+
+  return {
+    prCount: prs.length,
+    mergedPrCount: merged.length,
+    mergeRate: prs.length > 0 ? Math.round((merged.length / prs.length) * 100) : 0,
+    avgTimeToMergeHours:
+      mergeTimes.length > 0
+        ? Math.round(mergeTimes.reduce((a, b) => a + b, 0) / mergeTimes.length / 3600000)
+        : null,
+    commitCount: commits.length,
+    totalAdditions:
+      prs.reduce((sum, p) => sum + p.additions, 0) + commits.reduce((sum, c) => sum + c.additions, 0),
+    totalDeletions:
+      prs.reduce((sum, p) => sum + p.deletions, 0) + commits.reduce((sum, c) => sum + c.deletions, 0),
+  };
+};
+
 // Helpers
 
 const buildDailyBuckets = (dates, days) => {
