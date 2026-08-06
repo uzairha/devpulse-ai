@@ -1,5 +1,16 @@
 # Development Log
 
+## Week 3, Day 14 — 2026-08-05
+
+### Tasks Completed
+- [x] Task 66 — AI endpoint rate limiting (10 req/min per token)
+- [x] Task 67 — PR filter by state (All / Open / Merged / Closed)
+- [x] Task 68 — Onboarding empty state with guided steps on Dashboard
+- [x] Task 69 — Export analytics as JSON from repo detail page
+- [x] Task 70 — Week 3 documentation update
+
+---
+
 ## Week 2, Day 10 — 2026-07-30
 
 ### Tasks Completed
