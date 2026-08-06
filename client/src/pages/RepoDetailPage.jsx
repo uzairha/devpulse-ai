@@ -103,26 +103,47 @@ function PrRow({ pr }) {
   );
 }
 
+const PR_STATES = ['all', 'open', 'merged', 'closed'];
+
 function PrTable({ repoId }) {
   const [data, setData] = useState(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [stateFilter, setStateFilter] = useState('all');
 
-  const fetch = useCallback((p) => {
+  const fetch = useCallback((p, state) => {
     setLoading(true);
-    api.get(`/analytics/${repoId}/prs?page=${p}&limit=25`)
+    const stateParam = state !== 'all' ? `&state=${state}` : '';
+    api.get(`/analytics/${repoId}/prs?page=${p}&limit=25${stateParam}`)
       .then((res) => { setData(res.data); setPage(p); })
       .finally(() => setLoading(false));
   }, [repoId]);
 
-  useEffect(() => { fetch(1); }, [fetch]);
+  useEffect(() => { fetch(1, stateFilter); }, [fetch, stateFilter]);
+
+  const handleStateChange = (s) => { setStateFilter(s); fetch(1, s); };
 
   if (loading && !data) return <div className="table-loading">Loading…</div>;
-  if (!data?.total) return <div className="table-empty">No pull requests found. Run a sync first.</div>;
 
   return (
     <>
-      <div className="data-table-wrap">
+      <div className="pr-filter-tabs">
+        {PR_STATES.map((s) => (
+          <button
+            key={s}
+            className={`pr-filter-tab ${stateFilter === s ? 'active' : ''}`}
+            onClick={() => handleStateChange(s)}
+          >
+            {s.charAt(0).toUpperCase() + s.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {!data?.total ? (
+        <div className="table-empty">No pull requests found{stateFilter !== 'all' ? ` with state "${stateFilter}"` : ''}.</div>
+      ) : null}
+
+      {data?.total > 0 && <div className="data-table-wrap">
         <table className="data-table">
           <thead>
             <tr>
@@ -139,8 +160,8 @@ function PrTable({ repoId }) {
             {data.data.map((pr) => <PrRow key={pr.id} pr={pr} />)}
           </tbody>
         </table>
-      </div>
-      <Pagination page={page} pages={data.pages} onPage={fetch} />
+      </div>}
+      {data?.total > 0 && <Pagination page={page} pages={data.pages} onPage={(p) => fetch(p, stateFilter)} />}
     </>
   );
 }
@@ -324,16 +345,35 @@ function RepoDetailPage() {
           <span className="breadcrumb-sep">/</span>
           <span className="breadcrumb-current">{repo?.fullName ?? '…'}</span>
         </div>
-        <div className="days-tabs">
-          {DAYS_OPTIONS.map((d) => (
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div className="days-tabs">
+            {DAYS_OPTIONS.map((d) => (
+              <button
+                key={d}
+                className={`days-tab ${days === d ? 'active' : ''}`}
+                onClick={() => setDays(d)}
+              >
+                {d}d
+              </button>
+            ))}
+          </div>
+          {analytics && (
             <button
-              key={d}
-              className={`days-tab ${days === d ? 'active' : ''}`}
-              onClick={() => setDays(d)}
+              className="export-btn"
+              onClick={() => {
+                const blob = new Blob([JSON.stringify(analytics, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${analytics.repo.fullName.replace('/', '-')}-analytics-${days}d.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              title="Export analytics as JSON"
             >
-              {d}d
+              ↓ Export
             </button>
-          ))}
+          )}
         </div>
       </div>
 
