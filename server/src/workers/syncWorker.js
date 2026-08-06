@@ -2,6 +2,7 @@ import { Worker } from 'bullmq';
 import prisma from '../lib/prisma.js';
 import { getRepoPullRequests, getRepoCommits } from '../services/githubApiService.js';
 import { createNotification } from '../services/notificationService.js';
+import { invalidateRepoCache } from '../lib/cache.js';
 import config from '../config/index.js';
 import logger from '../lib/logger.js';
 
@@ -95,6 +96,8 @@ const processSync = async (job) => {
       where: { id: repositoryId },
       data: { lastSyncAt: new Date() },
     });
+
+    await invalidateRepoCache(repositoryId);
 
     logger.info(`Sync completed for ${repo.fullName}: ${prs.length} PRs, ${commits.length} commits`);
 
