@@ -15,8 +15,11 @@ Full 150-task roadmap approved and on file in conversation history.
 
 ## Current Status
 
-- [x] Task 1 — Initialize monorepo structure
-- [ ] Task 2 — Scaffold Express backend
-- [ ] Task 3 — Scaffold React frontend
-- [ ] Task 4 — Docker Compose for local dev
-- [ ] Task 5 — ESLint and Prettier
+_See `docs/development-log.md` for the task-by-task log._
+
+- [x] Week 1 (Tasks 1–25) — Foundation, DB, Auth, GitHub OAuth
+- [x] Week 2 (Tasks 26–50) — GitHub sync, analytics API, dashboard
+- [x] Week 3 (Tasks 51–75) — AI features, background jobs, security, webhooks, contributor view, Redis caching
+- [ ] Week 4 (Tasks 76–100) — Webhooks, UX polish, advanced analytics
+- [ ] Week 5 (Tasks 101–125) — Comprehensive testing
+- [ ] Week 6 (Tasks 126–150) — CI/CD, Docker, deployment, launch

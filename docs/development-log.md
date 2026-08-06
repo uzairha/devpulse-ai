@@ -1,5 +1,60 @@
 # Development Log
 
+## Week 3, Day 15 — 2026-08-06
+
+### Tasks Completed
+- [x] Task 71 — Webhook support: GitHub push events trigger auto-sync
+- [x] Task 72 — Contributor detail view (click a contributor to see their PRs/commits)
+- [x] Task 73 — Week 3 review + polish
+- [x] Task 74 — Redis caching layer for analytics queries
+- [x] Task 75 — Week 3 documentation + roadmap update
+
+### Files Created
+- `server/src/controllers/webhookController.js` — HMAC-verified GitHub webhook receiver
+- `server/src/routes/webhooks.js`
+- `server/src/lib/redis.js`, `server/src/lib/cache.js` — ioredis client + get/set/invalidate helpers
+- `client/src/components/RepoTables.jsx` — shared PrTable/CommitTable/Pagination/PrStatusBadge, extracted from RepoDetailPage so ContributorDetailPage can reuse them
+- `client/src/pages/ContributorDetailPage.jsx` — per-contributor summary + filtered PR/commit tables, route `/repos/:id/contributors/:login`
+
+### Files Modified
+- `server/prisma/schema.prisma` — added `Repository.webhookId`
+- `server/src/services/githubApiService.js` — `createRepoWebhook` / `deleteRepoWebhook`
+- `server/src/controllers/repoController.js` — registers a push webhook on connect, removes it on disconnect (best-effort; doesn't block the request if GitHub rejects it, e.g. no admin access)
+- `server/src/controllers/analyticsController.js` — `author` filter on PR/commit lists, new `getContributor` endpoint, Redis caching (120s TTL) on the two aggregation endpoints (`getRepoAnalytics`, `getContributor`)
+- `server/src/services/analyticsService.js` — `getContributorSummary`
+- `server/src/workers/syncWorker.js` — invalidates a repo's analytics cache after a successful sync
+- `server/src/routes/analytics.js` — new contributor route + `author` query validation
+- `server/src/index.js` — raw-body parsing for the webhook route ahead of the global JSON parser, mounted `/api/webhooks`
+- `server/src/config/index.js`, `server/.env.example` — `GITHUB_WEBHOOK_SECRET`, `WEBHOOK_BASE_URL`
+- `client/src/pages/RepoDetailPage.jsx` — now imports shared tables from `RepoTables.jsx`; Top Contributors rows link to the contributor page (also fixed a pre-existing duplicate/typo'd `PrStatebage` component while extracting)
+- `client/src/pages/ReposPage.jsx` — "⚡ Auto-sync" badge on repo cards that have a registered webhook
+- `client/src/App.jsx` — route for `ContributorDetailPage`
+
+### Tests Added
+- None (manual testing: signed/unsigned webhook payloads via curl against a running server; contributor flow clicked through in-browser via claude-in-chrome; cache hit/miss and invalidation verified directly against Redis)
+
+### Known Issues
+- `server/.env` had an empty `OPENAI_API_KEY` going into today, which crashes a fresh boot (`lib/openai.js` builds the client eagerly at import time) — fixed by the user adding a real key mid-session; worth making that lazy so a missing key doesn't take down the whole server.
+- `aiLimiter`'s custom `keyGenerator` in `src/index.js` throws a non-fatal `ERR_ERL_KEY_GEN_IPV6` warning on boot — should switch to express-rate-limit's `ipKeyGenerator` helper.
+- Cache invalidation uses `redis.keys('analytics:<repoId>:*')`, which is fine at this app's scale but wouldn't be the right pattern under a much larger keyspace.
+- Repos connected before today won't have a webhook registered retroactively — only new connections register one.
+
+### Week 3 Summary
+All 25 tasks complete (Tasks 51–75). AI features, background job resilience, and security hardening:
+- OpenAI (`gpt-4o-mini`) integration: PR summaries, weekly reports, repository health score, and a per-repo AI chat endpoint grounded in that repo's PR/commit data
+- Sync worker notifications on completion/failure (`notificationService`, notification bell in the header)
+- PR filtering by state, analytics export as JSON
+- Onboarding empty state for first-time users
+- Security: AI endpoint rate limiting (10 req/min per token)
+- GitHub webhooks for auto-sync on push, so repos stay current without manual syncing
+- Contributor drill-down view
+- Redis-backed caching on the analytics aggregation endpoints
+
+### Next: Week 4 — Webhooks, UX Polish, Advanced Analytics (Tasks 76–100)
+- Task 76: TBD — see `docs/roadmap.md` for the week's focus areas
+
+---
+
 ## Week 3, Day 14 — 2026-08-05
 
 ### Tasks Completed
