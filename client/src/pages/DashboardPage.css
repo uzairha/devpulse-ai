@@ -139,6 +139,13 @@
   letter-spacing: 0.04em;
 }
 
+.metric-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .metric-value {
   font-size: 1.5rem;
   font-weight: 700;
@@ -149,6 +156,29 @@
 .metric-sub {
   font-size: 0.75rem;
   color: #9ca3af;
+}
+
+.metric-trend {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+
+.metric-trend--up {
+  color: #15803d;
+  background: #f0fdf4;
+}
+
+.metric-trend--down {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.metric-trend--flat {
+  color: #6b7280;
+  background: #f3f4f6;
 }
 
 /* Contributors */

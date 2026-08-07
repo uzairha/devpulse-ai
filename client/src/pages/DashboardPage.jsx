@@ -7,11 +7,26 @@ import './DashboardPage.css';
 
 const DAYS_OPTIONS = [7, 30, 90];
 
-function MetricCard({ label, value, sub }) {
+function TrendBadge({ deltaPct, invert }) {
+  if (deltaPct == null) return null;
+  const isGood = invert ? deltaPct <= 0 : deltaPct >= 0;
+  const direction = deltaPct === 0 ? 'flat' : isGood ? 'up' : 'down';
+  const arrow = deltaPct === 0 ? '→' : deltaPct > 0 ? '▲' : '▼';
+  return (
+    <span className={`metric-trend metric-trend--${direction}`} title="vs. previous period">
+      {arrow} {Math.abs(deltaPct)}%
+    </span>
+  );
+}
+
+function MetricCard({ label, value, sub, trend, trendInvert }) {
   return (
     <div className="metric-card">
       <span className="metric-label">{label}</span>
-      <span className="metric-value">{value ?? '—'}</span>
+      <div className="metric-value-row">
+        <span className="metric-value">{value ?? '—'}</span>
+        {trend && <TrendBadge deltaPct={trend.deltaPct} invert={trendInvert} />}
+      </div>
       {sub && <span className="metric-sub">{sub}</span>}
     </div>
   );
@@ -70,7 +85,7 @@ function DashboardPage() {
       .finally(() => setLoading(false));
   }, [selectedId, days]);
 
-  const { prMetrics: pr, commitMetrics: cm } = analytics || {};
+  const { prMetrics: pr, commitMetrics: cm, trends } = analytics || {};
 
   return (
     <div className="dashboard">
@@ -123,12 +138,19 @@ function DashboardPage() {
           <section className="dash-section">
             <h2 className="dash-section-title">Pull Requests</h2>
             <div className="metrics-grid">
-              <MetricCard label="Total PRs" value={pr.total} />
-              <MetricCard label="Merged" value={pr.merged} sub={`${pr.mergeRate}% merge rate`} />
+              <MetricCard label="Total PRs" value={pr.total} trend={trends?.prCount} />
+              <MetricCard
+                label="Merged"
+                value={pr.merged}
+                sub={`${pr.mergeRate}% merge rate`}
+                trend={trends?.mergedCount}
+              />
               <MetricCard label="Open" value={pr.open} />
               <MetricCard
                 label="Avg Time to Merge"
                 value={pr.avgTimeToMergeHours != null ? `${pr.avgTimeToMergeHours}h` : null}
+                trend={trends?.avgTimeToMergeHours}
+                trendInvert
               />
               <MetricCard label="Avg Reviews / PR" value={pr.avgReviewCount} />
               <MetricCard
@@ -141,7 +163,7 @@ function DashboardPage() {
           <section className="dash-section">
             <h2 className="dash-section-title">Commits</h2>
             <div className="metrics-grid">
-              <MetricCard label="Total Commits" value={cm.total} />
+              <MetricCard label="Total Commits" value={cm.total} trend={trends?.commitCount} />
               <MetricCard label="Contributors" value={cm.contributorCount} />
               <MetricCard
                 label="Lines Changed"
