@@ -146,6 +146,82 @@ export const getContributorSummary = async (repositoryId, login, days = 30) => {
   };
 };
 
+export const getPeriodComparison = async (repositoryId, days = 30, authorLogin = null) => {
+  const periodStart = getDaysAgo(days);
+  const previousStart = getDaysAgo(days * 2);
+
+  const [prs, commits] = await Promise.all([
+    prisma.pullRequest.findMany({
+      where: {
+        repositoryId,
+        createdAt: { gte: previousStart },
+        ...(authorLogin ? { authorLogin } : {}),
+      },
+      select: { createdAt: true, mergedAt: true },
+    }),
+    prisma.commit.findMany({
+      where: {
+        repositoryId,
+        committedAt: { gte: previousStart },
+        ...(authorLogin ? { authorLogin } : {}),
+      },
+      select: { committedAt: true },
+    }),
+  ]);
+
+  const currentPrs = prs.filter((p) => p.createdAt >= periodStart);
+  const previousPrs = prs.filter((p) => p.createdAt < periodStart);
+  const currentCommits = commits.filter((c) => c.committedAt >= periodStart);
+  const previousCommits = commits.filter((c) => c.committedAt < periodStart);
+
+  const avgMergeHours = (list) => {
+    const times = list
+      .filter((p) => p.mergedAt)
+      .map((p) => new Date(p.mergedAt) - new Date(p.createdAt))
+      .filter((ms) => ms > 0);
+    return times.length > 0
+      ? Math.round(times.reduce((a, b) => a + b, 0) / times.length / 3600000)
+      : null;
+  };
+
+  // null deltaPct means "no baseline to compare against" (previous period had zero activity)
+  const pctDelta = (current, previous) => {
+    if (previous === 0) return current === 0 ? 0 : null;
+    return Math.round(((current - previous) / previous) * 100);
+  };
+
+  const currentAvgMerge = avgMergeHours(currentPrs);
+  const previousAvgMerge = avgMergeHours(previousPrs);
+  const currentMergedCount = currentPrs.filter((p) => p.mergedAt).length;
+  const previousMergedCount = previousPrs.filter((p) => p.mergedAt).length;
+
+  return {
+    prCount: {
+      current: currentPrs.length,
+      previous: previousPrs.length,
+      deltaPct: pctDelta(currentPrs.length, previousPrs.length),
+    },
+    mergedCount: {
+      current: currentMergedCount,
+      previous: previousMergedCount,
+      deltaPct: pctDelta(currentMergedCount, previousMergedCount),
+    },
+    avgTimeToMergeHours: {
+      current: currentAvgMerge,
+      previous: previousAvgMerge,
+      deltaPct:
+        currentAvgMerge != null && previousAvgMerge != null
+          ? pctDelta(currentAvgMerge, previousAvgMerge)
+          : null,
+    },
+    commitCount: {
+      current: currentCommits.length,
+      previous: previousCommits.length,
+      deltaPct: pctDelta(currentCommits.length, previousCommits.length),
+    },
+  };
+};
+
 // Helpers
 
 const buildDailyBuckets = (dates, days) => {

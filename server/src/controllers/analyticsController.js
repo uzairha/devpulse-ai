@@ -1,5 +1,10 @@
 import prisma from '../lib/prisma.js';
-import { getPrMetrics, getCommitMetrics, getContributorSummary } from '../services/analyticsService.js';
+import {
+  getPrMetrics,
+  getCommitMetrics,
+  getContributorSummary,
+  getPeriodComparison,
+} from '../services/analyticsService.js';
 import { getCached, setCached } from '../lib/cache.js';
 
 export const getRepoAnalytics = async (req, res, next) => {
@@ -14,12 +19,19 @@ export const getRepoAnalytics = async (req, res, next) => {
     const cached = await getCached(cacheKey);
     if (cached) return res.json(cached);
 
-    const [prMetrics, commitMetrics] = await Promise.all([
+    const [prMetrics, commitMetrics, trends] = await Promise.all([
       getPrMetrics(repo.id, days),
       getCommitMetrics(repo.id, days),
+      getPeriodComparison(repo.id, days),
     ]);
 
-    const payload = { repo: { id: repo.id, fullName: repo.fullName, lastSyncAt: repo.lastSyncAt }, days, prMetrics, commitMetrics };
+    const payload = {
+      repo: { id: repo.id, fullName: repo.fullName, lastSyncAt: repo.lastSyncAt },
+      days,
+      prMetrics,
+      commitMetrics,
+      trends,
+    };
     await setCached(cacheKey, payload);
     res.json(payload);
   } catch (err) {
@@ -43,6 +55,7 @@ export const listPullRequests = async (req, res, next) => {
     else if (stateFilter === 'closed') where.state = 'closed';
     else if (stateFilter === 'merged') where.mergedAt = { not: null };
     if (req.query.author) where.authorLogin = req.query.author;
+    if (req.query.q) where.title = { contains: req.query.q, mode: 'insensitive' };
 
     const [prs, total] = await Promise.all([
       prisma.pullRequest.findMany({
@@ -79,6 +92,7 @@ export const listCommits = async (req, res, next) => {
 
     const where = { repositoryId: repo.id };
     if (req.query.author) where.authorLogin = req.query.author;
+    if (req.query.q) where.message = { contains: req.query.q, mode: 'insensitive' };
 
     const [commits, total] = await Promise.all([
       prisma.commit.findMany({
@@ -119,11 +133,14 @@ export const getContributor = async (req, res, next) => {
       return res.status(404).json({ error: 'No activity found for this contributor' });
     }
 
+    const trends = await getPeriodComparison(repo.id, days, req.params.login);
+
     const payload = {
       login: req.params.login,
       days,
       repo: { id: repo.id, fullName: repo.fullName },
       ...summary,
+      trends,
     };
     await setCached(cacheKey, payload);
     res.json(payload);
