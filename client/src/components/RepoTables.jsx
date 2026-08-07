@@ -89,40 +89,61 @@ export function PrTable({ repoId, author }) {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [stateFilter, setStateFilter] = useState('all');
+  const [q, setQ] = useState('');
+  const [qDebounced, setQDebounced] = useState('');
   const showAuthor = !author;
 
-  const fetchPage = useCallback((p, state) => {
+  useEffect(() => {
+    const t = setTimeout(() => setQDebounced(q), 350);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const fetchPage = useCallback((p, state, query) => {
     setLoading(true);
     const params = new URLSearchParams({ page: p, limit: 25 });
     if (state !== 'all') params.set('state', state);
     if (author) params.set('author', author);
+    if (query) params.set('q', query);
     api.get(`/analytics/${repoId}/prs?${params}`)
       .then((res) => { setData(res.data); setPage(p); })
       .finally(() => setLoading(false));
   }, [repoId, author]);
 
-  useEffect(() => { fetchPage(1, stateFilter); }, [fetchPage, stateFilter]);
+  useEffect(() => { fetchPage(1, stateFilter, qDebounced); }, [fetchPage, stateFilter, qDebounced]);
 
-  const handleStateChange = (s) => { setStateFilter(s); fetchPage(1, s); };
+  const handleStateChange = (s) => { setStateFilter(s); fetchPage(1, s, qDebounced); };
 
   if (loading && !data) return <div className="table-loading">Loading…</div>;
 
   return (
     <>
-      <div className="pr-filter-tabs">
-        {PR_STATES.map((s) => (
-          <button
-            key={s}
-            className={`pr-filter-tab ${stateFilter === s ? 'active' : ''}`}
-            onClick={() => handleStateChange(s)}
-          >
-            {s.charAt(0).toUpperCase() + s.slice(1)}
-          </button>
-        ))}
+      <div className="table-toolbar">
+        <div className="pr-filter-tabs">
+          {PR_STATES.map((s) => (
+            <button
+              key={s}
+              className={`pr-filter-tab ${stateFilter === s ? 'active' : ''}`}
+              onClick={() => handleStateChange(s)}
+            >
+              {s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+        </div>
+        <input
+          type="text"
+          className="table-search"
+          placeholder="Search PR titles…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
       </div>
 
       {!data?.total ? (
-        <div className="table-empty">No pull requests found{stateFilter !== 'all' ? ` with state "${stateFilter}"` : ''}.</div>
+        <div className="table-empty">
+          No pull requests found
+          {stateFilter !== 'all' ? ` with state "${stateFilter}"` : ''}
+          {qDebounced ? ` matching "${qDebounced}"` : ''}.
+        </div>
       ) : null}
 
       {data?.total > 0 && <div className="data-table-wrap">
@@ -145,7 +166,7 @@ export function PrTable({ repoId, author }) {
           </tbody>
         </table>
       </div>}
-      {data?.total > 0 && <Pagination page={page} pages={data.pages} onPage={(p) => fetchPage(p, stateFilter)} />}
+      {data?.total > 0 && <Pagination page={page} pages={data.pages} onPage={(p) => fetchPage(p, stateFilter, qDebounced)} />}
     </>
   );
 }
@@ -154,25 +175,48 @@ export function CommitTable({ repoId, author }) {
   const [data, setData] = useState(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState('');
+  const [qDebounced, setQDebounced] = useState('');
   const showAuthor = !author;
 
-  const fetchPage = useCallback((p) => {
+  useEffect(() => {
+    const t = setTimeout(() => setQDebounced(q), 350);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const fetchPage = useCallback((p, query) => {
     setLoading(true);
     const params = new URLSearchParams({ page: p, limit: 25 });
     if (author) params.set('author', author);
+    if (query) params.set('q', query);
     api.get(`/analytics/${repoId}/commits?${params}`)
       .then((res) => { setData(res.data); setPage(p); })
       .finally(() => setLoading(false));
   }, [repoId, author]);
 
-  useEffect(() => { fetchPage(1); }, [fetchPage]);
+  useEffect(() => { fetchPage(1, qDebounced); }, [fetchPage, qDebounced]);
 
   if (loading && !data) return <div className="table-loading">Loading…</div>;
-  if (!data?.total) return <div className="table-empty">No commits found. Run a sync first.</div>;
 
   return (
     <>
-      <div className="data-table-wrap">
+      <div className="table-toolbar table-toolbar--end">
+        <input
+          type="text"
+          className="table-search"
+          placeholder="Search commit messages…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+      </div>
+
+      {!data?.total ? (
+        <div className="table-empty">
+          No commits found{qDebounced ? ` matching "${qDebounced}"` : '. Run a sync first.'}
+        </div>
+      ) : null}
+
+      {data?.total > 0 && <div className="data-table-wrap">
         <table className="data-table">
           <thead>
             <tr>
@@ -202,8 +246,10 @@ export function CommitTable({ repoId, author }) {
             ))}
           </tbody>
         </table>
-      </div>
-      <Pagination page={page} pages={data.pages} onPage={fetchPage} />
+      </div>}
+      {data?.total > 0 && (
+        <Pagination page={page} pages={data.pages} onPage={(p) => fetchPage(p, qDebounced)} />
+      )}
     </>
   );
 }
