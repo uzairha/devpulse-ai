@@ -107,6 +107,26 @@
   text-decoration: underline;
 }
 
+.github-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  padding: 0.75rem;
+  background: #24292e;
+  color: white;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s;
+  margin-bottom: 0.5rem;
+}
+
+.github-btn:hover {
+  background: #1a1e22;
+}
+
 .auth-divider {
   display: flex;
   align-items: center;
