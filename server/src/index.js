@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import helmet from 'helmet';
-import { rateLimit } from 'express-rate-limit';
+import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import config from './config/index.js';
 import healthRouter from './routes/health.js';
 import authRouter from './routes/auth.js';
@@ -37,7 +37,7 @@ const aiLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.headers.authorization || req.ip,
+  keyGenerator: (req) => req.headers.authorization || ipKeyGenerator(req.ip),
   message: { error: 'AI rate limit reached. Please wait a moment before trying again.' },
 });
 

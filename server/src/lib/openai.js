@@ -1,10 +1,20 @@
 import OpenAI from 'openai';
 import config from '../config/index.js';
 
-const openai = new OpenAI({ apiKey: config.openaiApiKey });
+let openai;
+
+const getClient = () => {
+  if (!config.openaiApiKey) {
+    throw new Error('OPENAI_API_KEY is not set — AI features are unavailable.');
+  }
+  if (!openai) {
+    openai = new OpenAI({ apiKey: config.openaiApiKey });
+  }
+  return openai;
+};
 
 export const chat = async (systemPrompt, userPrompt, { maxTokens = 500 } = {}) => {
-  const response = await openai.chat.completions.create({
+  const response = await getClient().chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
       { role: 'system', content: systemPrompt },
