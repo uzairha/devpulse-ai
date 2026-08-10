@@ -8,6 +8,26 @@ export function PrStatusBadge({ state, mergedAt }) {
   return <span className="pr-badge pr-badge--closed">Closed</span>;
 }
 
+function toCsv(rows, columns) {
+  const escape = (v) => {
+    const s = v == null ? '' : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const header = columns.map((c) => escape(c.label)).join(',');
+  const lines = rows.map((row) => columns.map((c) => escape(c.value(row))).join(','));
+  return [header, ...lines].join('\n');
+}
+
+function downloadCsv(filename, csv) {
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function Pagination({ page, pages, onPage }) {
   if (pages <= 1) return null;
   return (
@@ -91,6 +111,7 @@ export function PrTable({ repoId, author }) {
   const [stateFilter, setStateFilter] = useState('all');
   const [q, setQ] = useState('');
   const [qDebounced, setQDebounced] = useState('');
+  const [exporting, setExporting] = useState(false);
   const showAuthor = !author;
 
   useEffect(() => {
@@ -113,6 +134,29 @@ export function PrTable({ repoId, author }) {
 
   const handleStateChange = (s) => { setStateFilter(s); fetchPage(1, s, qDebounced); };
 
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({ page: 1, limit: 100 });
+      if (stateFilter !== 'all') params.set('state', stateFilter);
+      if (author) params.set('author', author);
+      if (qDebounced) params.set('q', qDebounced);
+      const res = await api.get(`/analytics/${repoId}/prs?${params}`);
+      const columns = [
+        { label: '#', value: (pr) => pr.number },
+        { label: 'Title', value: (pr) => pr.title },
+        ...(showAuthor ? [{ label: 'Author', value: (pr) => pr.authorLogin }] : []),
+        { label: 'State', value: (pr) => (pr.mergedAt ? 'merged' : pr.state) },
+        { label: 'Additions', value: (pr) => pr.additions },
+        { label: 'Deletions', value: (pr) => pr.deletions },
+        { label: 'Created', value: (pr) => new Date(pr.createdAt).toISOString().slice(0, 10) },
+      ];
+      downloadCsv('pull-requests.csv', toCsv(res.data.data, columns));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading && !data) return <div className="table-loading">Loading…</div>;
 
   return (
@@ -129,13 +173,20 @@ export function PrTable({ repoId, author }) {
             </button>
           ))}
         </div>
-        <input
-          type="text"
-          className="table-search"
-          placeholder="Search PR titles…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
+        <div className="table-toolbar-search">
+          <input
+            type="text"
+            className="table-search"
+            placeholder="Search PR titles…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          {data?.total > 0 && (
+            <button className="export-btn" onClick={handleExport} disabled={exporting} title="Export as CSV">
+              {exporting ? '…' : '↓ CSV'}
+            </button>
+          )}
+        </div>
       </div>
 
       {!data?.total ? (
@@ -177,6 +228,7 @@ export function CommitTable({ repoId, author }) {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
   const [qDebounced, setQDebounced] = useState('');
+  const [exporting, setExporting] = useState(false);
   const showAuthor = !author;
 
   useEffect(() => {
@@ -196,6 +248,27 @@ export function CommitTable({ repoId, author }) {
 
   useEffect(() => { fetchPage(1, qDebounced); }, [fetchPage, qDebounced]);
 
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({ page: 1, limit: 100 });
+      if (author) params.set('author', author);
+      if (qDebounced) params.set('q', qDebounced);
+      const res = await api.get(`/analytics/${repoId}/commits?${params}`);
+      const columns = [
+        { label: 'SHA', value: (c) => c.sha.slice(0, 7) },
+        { label: 'Message', value: (c) => c.message.split('\n')[0] },
+        ...(showAuthor ? [{ label: 'Author', value: (c) => c.authorLogin }] : []),
+        { label: 'Additions', value: (c) => c.additions },
+        { label: 'Deletions', value: (c) => c.deletions },
+        { label: 'Date', value: (c) => new Date(c.committedAt).toISOString().slice(0, 10) },
+      ];
+      downloadCsv('commits.csv', toCsv(res.data.data, columns));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading && !data) return <div className="table-loading">Loading…</div>;
 
   return (
@@ -208,6 +281,11 @@ export function CommitTable({ repoId, author }) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
+        {data?.total > 0 && (
+          <button className="export-btn" onClick={handleExport} disabled={exporting} title="Export as CSV">
+            {exporting ? '…' : '↓ CSV'}
+          </button>
+        )}
       </div>
 
       {!data?.total ? (
