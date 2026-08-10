@@ -1,5 +1,101 @@
 # Development Log
 
+## Week 4, Day 17 — 2026-08-09
+
+### Tasks Completed
+- [x] Task 79 — Fix two Week 3 known issues: OpenAI eager-init crash risk, rate-limit IPv6 warning
+
+### Files Modified
+- `server/src/lib/openai.js` — client is now built lazily on first `chat()` call via `getClient()`, instead of at import time; throws a clear `OPENAI_API_KEY is not set` error (caught by existing `next(err)` handlers in `aiController.js`, surfaces as a normal 500) rather than crashing the whole server on boot when the key is missing/empty
+- `server/src/index.js` — `aiLimiter`'s `keyGenerator` now wraps the `req.ip` fallback in express-rate-limit's `ipKeyGenerator` helper (only used when there's no `Authorization` header), clearing the `ERR_ERL_KEY_GEN_IPV6` boot warning
+
+### Tests Added
+- None (manual verification: edited files, confirmed `node --watch` auto-restarted the server without crashing and `/api/health` still returned 200; `npm run lint` clean)
+
+### Known Issues
+- `redis.keys('analytics:<repoId>:*')` cache invalidation pattern — fine at current scale, not addressed.
+- Repos connected before Task 71 still don't have a webhook registered retroactively.
+
+### Next: Week 4, Task 80+
+- TBD — options considered but deferred: date-range picker for analytics, extracting the now-3x-duplicated `MetricCard` component, CSV export for PR/commit tables
+
+---
+
+## Week 4, Day 17 (cont.) — Task 80 — 2026-08-09
+
+### Tasks Completed
+- [x] Task 80 — Extract shared `MetricCard`/`TrendBadge` component
+
+### Files Created
+- `client/src/components/MetricCard.jsx` — exports `MetricCard` and `TrendBadge`, extracted verbatim from the 3 identical copies in Dashboard/RepoDetail/ContributorDetail
+
+### Files Modified
+- `client/src/pages/DashboardPage.jsx`, `client/src/pages/RepoDetailPage.jsx`, `client/src/pages/ContributorDetailPage.jsx` — removed local `MetricCard`/`TrendBadge` definitions, import from `components/MetricCard.jsx` instead
+
+### Tests Added
+- None (manual: `npm run lint` shows fewer errors than before — 37 → 21 across the touched files, since prop-types debt on the shared component no longer triples up; verified end-to-end in-browser via claude-in-chrome — Dashboard, Repo Detail, and Contributor Detail all render trend badges correctly after the refactor. Also had to start Docker Desktop / `docker compose up -d`, which wasn't running at session start — Postgres/Redis containers weren't up.)
+
+### Known Issues
+- Same two carried over (`redis.keys()` cache invalidation pattern, retroactive webhook registration) — not in scope for this task.
+- Repositories page shows "Never synced" for both seeded repos despite having PR/commit data — seed script inserts data directly without setting `repo.lastSyncAt`. Pre-existing, not introduced by this task.
+
+### Next: Week 4, Task 81+
+- Remaining deferred options: date-range picker for analytics, CSV export for PR/commit tables
+
+---
+
+## Week 4, Day 17 (cont.) — Task 81 — 2026-08-09
+
+### Tasks Completed
+- [x] Task 81 — CSV export for PR/commit tables
+
+### Files Modified
+- `client/src/components/RepoTables.jsx` — added `toCsv`/`downloadCsv` helpers; `PrTable` and `CommitTable` each gained a "↓ CSV" button in the table toolbar next to search. On click, re-fetches the current filter/search state (state filter, author, query) with `limit=100` (the server-side cap) rather than exporting just the loaded page, converts to CSV client-side, and triggers a browser download — same blob/anchor-click pattern as the existing JSON analytics export on `RepoDetailPage.jsx`. PR columns: #, Title, Author (if shown), State, Additions, Deletions, Created. Commit columns: SHA (short), Message (first line), Author (if shown), Additions, Deletions, Date.
+- `client/src/pages/RepoDetailPage.css` — new `.table-toolbar-search` flex wrapper so the search input and CSV button group together on the right of `PrTable`'s toolbar (which also has the state-filter tabs on the left); reuses the existing `.export-btn` style from the JSON export button.
+
+### Tests Added
+- None (manual: lint error count on `RepoTables.jsx` unchanged before/after — 26/26, confirming no new prop-types/effect debt introduced; verified in-browser via claude-in-chrome that the button renders correctly on both PR and Commit tables and the export fetch (`GET /analytics/:id/prs?page=1&limit=100`) returns 200. Could not confirm the resulting file lands in `~/Downloads` from the automated browser session — tested the pre-existing JSON export button the same way and it also doesn't produce a file there, confirming this is a sandboxing limitation of the automated browser profile, not a regression; the download call itself uses the identical, already-shipped blob/anchor pattern.)
+
+### Known Issues
+- Export is capped at 100 rows (the server's hard `limit` cap on `/prs` and `/commits`) — fine at this app's scale, would need pagination-aware export for larger repos.
+- Same two carried over from earlier in the day (`redis.keys()` cache invalidation, retroactive webhook registration) — not in scope.
+
+### Week 4 Day 17 Summary
+Tasks 79, 80, 81 done: fixed both outstanding known issues (OpenAI eager-init crash risk, rate-limit IPv6 warning), extracted the shared `MetricCard`/`TrendBadge` component out of 3 duplicated copies, and added CSV export to the PR/commit tables. Also had to start Docker Desktop mid-session (Postgres/Redis weren't running).
+
+### Next: Week 4, Task 82+
+- Remaining deferred option: date-range picker for analytics (currently fixed 7d/30d/90d presets, no custom range)
+
+---
+
+## Week 4, Day 16 — 2026-08-07
+
+### Tasks Completed
+- [x] Task 76 — Period-over-period trend deltas on Dashboard and Repo Detail metric cards
+- [x] Task 77 — Text search on PR/commit tables
+- [x] Task 78 — Extended trend badges to Contributor Detail page
+
+### Files Created
+- None (all changes extended existing files)
+
+### Files Modified
+- `server/src/services/analyticsService.js` — `getPeriodComparison(repositoryId, days, authorLogin?)`: one query per entity (PRs, commits) spanning 2×`days`, split in JS into current/previous windows; returns `{current, previous, deltaPct}` per metric (`prCount`, `mergedCount`, `avgTimeToMergeHours`, `commitCount`); `deltaPct` is `null` with no prior-period baseline
+- `server/src/controllers/analyticsController.js` — `getRepoAnalytics` and `getContributor` both add a `trends` key to their response (same cache key/TTL as the rest of the payload); PR/commit list endpoints accept `?q=` for text search
+- `client/src/pages/DashboardPage.jsx`, `client/src/pages/RepoDetailPage.jsx`, `client/src/pages/ContributorDetailPage.jsx` — `MetricCard` gained `trend`/`trendInvert` props rendering a colored ▲/▼ badge (green=good/red=bad; `trendInvert` flips polarity for metrics where lower is better, e.g. avg time to merge). Still three separate near-identical copies of this component, not extracted — matches existing per-page duplication pattern.
+- `client/src/components/RepoTables.jsx` — debounced (350ms) search input in a new `.table-toolbar` row on `PrTable`/`CommitTable`, shared with the existing PR state filter tabs; empty-state message reflects the active query
+
+### Tests Added
+- None (manual/in-browser verification via claude-in-chrome: trend badges checked on Dashboard, Repo Detail, and Contributor Detail pages against the seeded testuser/frontend-app repo; search verified by querying "feature 3" on PRs and "commit 5" on commits, both correctly narrowing to the single matching row)
+
+### Known Issues
+- Same four carried over from Day 15 (OpenAI client eager-init crash risk, `ERR_ERL_KEY_GEN_IPV6` warning, `redis.keys()` cache invalidation pattern, pre-Task-71 repos missing webhooks) — none addressed today.
+- Sitewide prop-types lint debt (from Task 73) now also covers the new `trend`/`trendInvert` props — left as-is, consistent with that prior decision.
+
+### Next: Week 4, Task 79+
+- TBD — pick based on what's actually built vs. the "UX polish + advanced analytics" week goal
+
+---
+
 ## Week 3, Day 15 — 2026-08-06
 
 ### Tasks Completed
