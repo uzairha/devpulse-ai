@@ -7,27 +7,62 @@ import {
 } from '../services/analyticsService.js';
 import { getCached, setCached } from '../lib/cache.js';
 
+const MAX_RANGE_DAYS = 365;
+
+// Resolves either ?days=N (preset, relative to now) or ?startDate=&endDate= (custom range)
+// into a concrete { since, until } window, clamped to now and to MAX_RANGE_DAYS.
+const resolveRange = (query) => {
+  const now = new Date();
+
+  if (query.startDate && query.endDate) {
+    const since = new Date(`${query.startDate}T00:00:00.000Z`);
+    const until = new Date(`${query.endDate}T23:59:59.999Z`);
+    if (Number.isNaN(since.getTime()) || Number.isNaN(until.getTime()) || since > until) {
+      return null;
+    }
+    if (until > now) until.setTime(now.getTime());
+
+    const minSince = new Date(until);
+    minSince.setDate(minSince.getDate() - MAX_RANGE_DAYS);
+    if (since < minSince) since.setTime(minSince.getTime());
+
+    return { since, until };
+  }
+
+  const days = Math.min(parseInt(query.days) || 30, MAX_RANGE_DAYS);
+  const until = now;
+  const since = new Date(until);
+  since.setDate(since.getDate() - days);
+  return { since, until };
+};
+
+const rangeCacheKey = ({ since, until }) =>
+  `${since.toISOString().slice(0, 10)}:${until.toISOString().slice(0, 10)}`;
+
 export const getRepoAnalytics = async (req, res, next) => {
   try {
     const repo = await prisma.repository.findUnique({ where: { id: req.params.id } });
     if (!repo) return res.status(404).json({ error: 'Repository not found' });
     if (repo.userId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
 
-    const days = Math.min(parseInt(req.query.days) || 30, 365);
-    const cacheKey = `analytics:${repo.id}:overview:${days}`;
+    const range = resolveRange(req.query);
+    if (!range) return res.status(400).json({ error: 'Invalid date range' });
+
+    const cacheKey = `analytics:${repo.id}:overview:${rangeCacheKey(range)}`;
 
     const cached = await getCached(cacheKey);
     if (cached) return res.json(cached);
 
     const [prMetrics, commitMetrics, trends] = await Promise.all([
-      getPrMetrics(repo.id, days),
-      getCommitMetrics(repo.id, days),
-      getPeriodComparison(repo.id, days),
+      getPrMetrics(repo.id, range),
+      getCommitMetrics(repo.id, range),
+      getPeriodComparison(repo.id, range),
     ]);
 
     const payload = {
       repo: { id: repo.id, fullName: repo.fullName, lastSyncAt: repo.lastSyncAt },
-      days,
+      startDate: range.since.toISOString().slice(0, 10),
+      endDate: range.until.toISOString().slice(0, 10),
       prMetrics,
       commitMetrics,
       trends,
@@ -121,23 +156,26 @@ export const getContributor = async (req, res, next) => {
     if (!repo) return res.status(404).json({ error: 'Repository not found' });
     if (repo.userId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
 
-    const days = Math.min(parseInt(req.query.days) || 30, 365);
-    const cacheKey = `analytics:${repo.id}:contributor:${req.params.login}:${days}`;
+    const range = resolveRange(req.query);
+    if (!range) return res.status(400).json({ error: 'Invalid date range' });
+
+    const cacheKey = `analytics:${repo.id}:contributor:${req.params.login}:${rangeCacheKey(range)}`;
 
     const cached = await getCached(cacheKey);
     if (cached) return res.json(cached);
 
-    const summary = await getContributorSummary(repo.id, req.params.login, days);
+    const summary = await getContributorSummary(repo.id, req.params.login, range);
 
     if (summary.prCount === 0 && summary.commitCount === 0) {
       return res.status(404).json({ error: 'No activity found for this contributor' });
     }
 
-    const trends = await getPeriodComparison(repo.id, days, req.params.login);
+    const trends = await getPeriodComparison(repo.id, range, req.params.login);
 
     const payload = {
       login: req.params.login,
-      days,
+      startDate: range.since.toISOString().slice(0, 10),
+      endDate: range.until.toISOString().slice(0, 10),
       repo: { id: repo.id, fullName: repo.fullName },
       ...summary,
       trends,
