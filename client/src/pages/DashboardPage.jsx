@@ -4,9 +4,8 @@ import useAuth from '../hooks/useAuth';
 import { MetricsGridSkeleton } from '../components/Skeleton';
 import OnboardingSteps from '../components/OnboardingSteps';
 import { MetricCard } from '../components/MetricCard';
+import { DateRangePicker, DEFAULT_RANGE, buildRangeQuery } from '../components/DateRangePicker';
 import './DashboardPage.css';
-
-const DAYS_OPTIONS = [7, 30, 90];
 
 function ActivityChart({ data }) {
   if (!data || data.length === 0) return null;
@@ -38,7 +37,7 @@ function DashboardPage() {
   const { user } = useAuth();
   const [repos, setRepos] = useState([]);
   const [selectedId, setSelectedId] = useState('');
-  const [days, setDays] = useState(30);
+  const [range, setRange] = useState(DEFAULT_RANGE);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -55,11 +54,11 @@ function DashboardPage() {
     setLoading(true);
     setError('');
     api
-      .get(`/analytics/${selectedId}?days=${days}`)
+      .get(`/analytics/${selectedId}?${buildRangeQuery(range)}`)
       .then((res) => setAnalytics(res.data))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [selectedId, days]);
+  }, [selectedId, range]);
 
   const { prMetrics: pr, commitMetrics: cm, trends } = analytics || {};
 
@@ -81,17 +80,7 @@ function DashboardPage() {
               ))}
             </select>
           )}
-          <div className="days-tabs">
-            {DAYS_OPTIONS.map((d) => (
-              <button
-                key={d}
-                className={`days-tab ${days === d ? 'active' : ''}`}
-                onClick={() => setDays(d)}
-              >
-                {d}d
-              </button>
-            ))}
-          </div>
+          <DateRangePicker range={range} onChange={setRange} />
         </div>
       </div>
 
