@@ -1,16 +1,8 @@
 import prisma from '../lib/prisma.js';
 
-const getDaysAgo = (days) => {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d;
-};
-
-export const getPrMetrics = async (repositoryId, days = 30) => {
-  const since = getDaysAgo(days);
-
+export const getPrMetrics = async (repositoryId, { since, until }) => {
   const prs = await prisma.pullRequest.findMany({
-    where: { repositoryId, createdAt: { gte: since } },
+    where: { repositoryId, createdAt: { gte: since, lte: until } },
     select: {
       state: true,
       createdAt: true,
@@ -48,7 +40,8 @@ export const getPrMetrics = async (repositoryId, days = 30) => {
   // PR throughput: merged PRs grouped by week
   const weeklyThroughput = buildWeeklyBuckets(
     merged.map((p) => p.mergedAt),
-    days,
+    since,
+    until,
   );
 
   return {
@@ -64,11 +57,9 @@ export const getPrMetrics = async (repositoryId, days = 30) => {
   };
 };
 
-export const getCommitMetrics = async (repositoryId, days = 30) => {
-  const since = getDaysAgo(days);
-
+export const getCommitMetrics = async (repositoryId, { since, until }) => {
   const commits = await prisma.commit.findMany({
-    where: { repositoryId, committedAt: { gte: since } },
+    where: { repositoryId, committedAt: { gte: since, lte: until } },
     select: {
       authorLogin: true,
       committedAt: true,
@@ -82,10 +73,11 @@ export const getCommitMetrics = async (repositoryId, days = 30) => {
   // Unique contributors
   const contributors = [...new Set(commits.map((c) => c.authorLogin).filter(Boolean))];
 
-  // Commits per day (last `days` days)
+  // Commits per day across the range
   const dailyActivity = buildDailyBuckets(
     commits.map((c) => c.committedAt),
-    days,
+    since,
+    until,
   );
 
   // Top contributors by commit count
@@ -111,16 +103,14 @@ export const getCommitMetrics = async (repositoryId, days = 30) => {
   };
 };
 
-export const getContributorSummary = async (repositoryId, login, days = 30) => {
-  const since = getDaysAgo(days);
-
+export const getContributorSummary = async (repositoryId, login, { since, until }) => {
   const [prs, commits] = await Promise.all([
     prisma.pullRequest.findMany({
-      where: { repositoryId, authorLogin: login, createdAt: { gte: since } },
+      where: { repositoryId, authorLogin: login, createdAt: { gte: since, lte: until } },
       select: { mergedAt: true, createdAt: true, additions: true, deletions: true },
     }),
     prisma.commit.findMany({
-      where: { repositoryId, authorLogin: login, committedAt: { gte: since } },
+      where: { repositoryId, authorLogin: login, committedAt: { gte: since, lte: until } },
       select: { additions: true, deletions: true },
     }),
   ]);
@@ -146,15 +136,15 @@ export const getContributorSummary = async (repositoryId, login, days = 30) => {
   };
 };
 
-export const getPeriodComparison = async (repositoryId, days = 30, authorLogin = null) => {
-  const periodStart = getDaysAgo(days);
-  const previousStart = getDaysAgo(days * 2);
+export const getPeriodComparison = async (repositoryId, { since, until }, authorLogin = null) => {
+  const periodStart = since;
+  const previousStart = new Date(since.getTime() - (until.getTime() - since.getTime()));
 
   const [prs, commits] = await Promise.all([
     prisma.pullRequest.findMany({
       where: {
         repositoryId,
-        createdAt: { gte: previousStart },
+        createdAt: { gte: previousStart, lte: until },
         ...(authorLogin ? { authorLogin } : {}),
       },
       select: { createdAt: true, mergedAt: true },
@@ -162,7 +152,7 @@ export const getPeriodComparison = async (repositoryId, days = 30, authorLogin =
     prisma.commit.findMany({
       where: {
         repositoryId,
-        committedAt: { gte: previousStart },
+        committedAt: { gte: previousStart, lte: until },
         ...(authorLogin ? { authorLogin } : {}),
       },
       select: { committedAt: true },
@@ -224,12 +214,15 @@ export const getPeriodComparison = async (repositoryId, days = 30, authorLogin =
 
 // Helpers
 
-const buildDailyBuckets = (dates, days) => {
+const buildDailyBuckets = (dates, since, until) => {
   const buckets = {};
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    buckets[d.toISOString().slice(0, 10)] = 0;
+  const cursor = new Date(since);
+  cursor.setHours(0, 0, 0, 0);
+  const end = new Date(until);
+  end.setHours(0, 0, 0, 0);
+  while (cursor <= end) {
+    buckets[cursor.toISOString().slice(0, 10)] = 0;
+    cursor.setDate(cursor.getDate() + 1);
   }
   for (const date of dates) {
     const key = new Date(date).toISOString().slice(0, 10);
@@ -238,15 +231,12 @@ const buildDailyBuckets = (dates, days) => {
   return Object.entries(buckets).map(([date, count]) => ({ date, count }));
 };
 
-const buildWeeklyBuckets = (dates, days) => {
-  const weeks = Math.ceil(days / 7);
+const buildWeeklyBuckets = (dates, since, until) => {
   const buckets = [];
-  for (let i = weeks - 1; i >= 0; i--) {
-    const end = new Date();
-    end.setDate(end.getDate() - i * 7);
-    const start = new Date(end);
-    start.setDate(start.getDate() - 7);
-    buckets.push({ weekStart: start.toISOString().slice(0, 10), count: 0 });
+  const cursor = new Date(since);
+  while (cursor < until) {
+    buckets.push({ weekStart: cursor.toISOString().slice(0, 10), count: 0 });
+    cursor.setDate(cursor.getDate() + 7);
   }
   for (const date of dates) {
     const t = new Date(date).getTime();
