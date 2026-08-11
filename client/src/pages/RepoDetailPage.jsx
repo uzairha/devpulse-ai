@@ -3,10 +3,9 @@ import { useParams, Link } from 'react-router-dom';
 import api from '../services/api';
 import { PrTable, CommitTable } from '../components/RepoTables';
 import { MetricCard } from '../components/MetricCard';
+import { DateRangePicker, DEFAULT_RANGE, buildRangeQuery } from '../components/DateRangePicker';
 import './DashboardPage.css';
 import './RepoDetailPage.css';
-
-const DAYS_OPTIONS = [7, 30, 90];
 
 function ActivityChart({ data }) {
   if (!data || data.length === 0) return null;
@@ -124,7 +123,7 @@ function HealthScoreCard({ repoId }) {
 
 function RepoDetailPage() {
   const { id } = useParams();
-  const [days, setDays] = useState(30);
+  const [range, setRange] = useState(DEFAULT_RANGE);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -134,11 +133,11 @@ function RepoDetailPage() {
     setLoading(true);
     setError('');
     api
-      .get(`/analytics/${id}?days=${days}`)
+      .get(`/analytics/${id}?${buildRangeQuery(range)}`)
       .then((res) => setAnalytics(res.data))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [id, days]);
+  }, [id, range]);
 
   const { prMetrics: pr, commitMetrics: cm, trends, repo } = analytics || {};
 
@@ -151,17 +150,7 @@ function RepoDetailPage() {
           <span className="breadcrumb-current">{repo?.fullName ?? '…'}</span>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <div className="days-tabs">
-            {DAYS_OPTIONS.map((d) => (
-              <button
-                key={d}
-                className={`days-tab ${days === d ? 'active' : ''}`}
-                onClick={() => setDays(d)}
-              >
-                {d}d
-              </button>
-            ))}
-          </div>
+          <DateRangePicker range={range} onChange={setRange} />
           {analytics && (
             <button
               className="export-btn"
@@ -170,7 +159,7 @@ function RepoDetailPage() {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `${analytics.repo.fullName.replace('/', '-')}-analytics-${days}d.json`;
+                a.download = `${analytics.repo.fullName.replace('/', '-')}-analytics-${analytics.startDate}_to_${analytics.endDate}.json`;
                 a.click();
                 URL.revokeObjectURL(url);
               }}

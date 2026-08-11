@@ -3,14 +3,13 @@ import { useParams, Link } from 'react-router-dom';
 import api from '../services/api';
 import { PrTable, CommitTable } from '../components/RepoTables';
 import { MetricCard } from '../components/MetricCard';
+import { DateRangePicker, DEFAULT_RANGE, buildRangeQuery } from '../components/DateRangePicker';
 import './DashboardPage.css';
 import './RepoDetailPage.css';
 
-const DAYS_OPTIONS = [7, 30, 90];
-
 function ContributorDetailPage() {
   const { id, login } = useParams();
-  const [days, setDays] = useState(30);
+  const [range, setRange] = useState(DEFAULT_RANGE);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -20,11 +19,11 @@ function ContributorDetailPage() {
     setLoading(true);
     setError('');
     api
-      .get(`/analytics/${id}/contributors/${encodeURIComponent(login)}?days=${days}`)
+      .get(`/analytics/${id}/contributors/${encodeURIComponent(login)}?${buildRangeQuery(range)}`)
       .then((res) => setSummary(res.data))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [id, login, days]);
+  }, [id, login, range]);
 
   return (
     <div className="dashboard">
@@ -38,17 +37,7 @@ function ContributorDetailPage() {
           <span className="breadcrumb-sep">/</span>
           <span className="breadcrumb-current">{login}</span>
         </div>
-        <div className="days-tabs">
-          {DAYS_OPTIONS.map((d) => (
-            <button
-              key={d}
-              className={`days-tab ${days === d ? 'active' : ''}`}
-              onClick={() => setDays(d)}
-            >
-              {d}d
-            </button>
-          ))}
-        </div>
+        <DateRangePicker range={range} onChange={setRange} />
       </div>
 
       {error ? (
