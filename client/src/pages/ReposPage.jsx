@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
+import { ConfirmModal } from '../components/ConfirmModal';
 import './ReposPage.css';
 
 function SyncStatus({ status, lastSyncAt }) {
@@ -96,6 +97,7 @@ function ReposPage() {
   const [actionId, setActionId] = useState(null);
   const [syncingId, setSyncingId] = useState(null);
   const [enablingAutoSyncId, setEnablingAutoSyncId] = useState(null);
+  const [pendingDisconnect, setPendingDisconnect] = useState(null);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const pollRef = useRef(null);
@@ -198,6 +200,7 @@ function ReposPage() {
   };
 
   const handleDisconnect = async (repo) => {
+    setPendingDisconnect(null);
     setActionId(repo.id);
     setError('');
     try {
@@ -241,7 +244,7 @@ function ReposPage() {
               <ConnectedRepoCard
                 key={repo.id}
                 repo={repo}
-                onDisconnect={handleDisconnect}
+                onDisconnect={setPendingDisconnect}
                 onSync={handleSync}
                 onEnableAutoSync={handleEnableAutoSync}
                 disconnecting={actionId === repo.id}
@@ -289,6 +292,18 @@ function ReposPage() {
           </>
         )}
       </section>
+
+      {pendingDisconnect && (
+        <ConfirmModal
+          title={`Disconnect ${pendingDisconnect.fullName}?`}
+          message="This permanently deletes all synced pull requests, commits, and analytics data for this repository. This cannot be undone."
+          confirmLabel="Disconnect"
+          danger
+          confirming={actionId === pendingDisconnect.id}
+          onConfirm={() => handleDisconnect(pendingDisconnect)}
+          onCancel={() => setPendingDisconnect(null)}
+        />
+      )}
     </div>
   );
 }
