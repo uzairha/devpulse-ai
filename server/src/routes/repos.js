@@ -9,6 +9,7 @@ import {
   triggerSync,
   getSyncStatus,
   disconnectRepo,
+  enableAutoSync,
 } from '../controllers/repoController.js';
 
 const router = Router();
@@ -45,6 +46,13 @@ router.delete(
   [param('id').isUUID().withMessage('Invalid repository id')],
   validate,
   disconnectRepo,
+);
+
+router.post(
+  '/:id/webhook',
+  [param('id').isUUID().withMessage('Invalid repository id')],
+  validate,
+  enableAutoSync,
 );
 
 export default router;

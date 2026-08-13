@@ -17,7 +17,7 @@ function SyncStatus({ status, lastSyncAt }) {
   return <span className="sync-badge sync-badge--none">Never synced</span>;
 }
 
-function ConnectedRepoCard({ repo, onDisconnect, onSync, disconnecting, syncing }) {
+function ConnectedRepoCard({ repo, onDisconnect, onSync, onEnableAutoSync, disconnecting, syncing, enablingAutoSync }) {
   return (
     <div className="repo-card">
       <div className="repo-card-info">
@@ -29,10 +29,19 @@ function ConnectedRepoCard({ repo, onDisconnect, onSync, disconnecting, syncing 
         {repo.description && <p className="repo-desc">{repo.description}</p>}
         <div className="repo-status-row">
           <SyncStatus status={repo.syncStatus} lastSyncAt={repo.lastSyncAt} />
-          {repo.webhookId && (
+          {repo.webhookId ? (
             <span className="sync-badge sync-badge--webhook" title="Auto-syncs on GitHub push">
               ⚡ Auto-sync
             </span>
+          ) : (
+            <button
+              className="repo-link-btn"
+              onClick={() => onEnableAutoSync(repo)}
+              disabled={enablingAutoSync}
+              title="Register a GitHub webhook so this repo syncs automatically on push"
+            >
+              {enablingAutoSync ? 'Enabling…' : 'Enable auto-sync'}
+            </button>
           )}
         </div>
       </div>
@@ -86,6 +95,7 @@ function ReposPage() {
   const [loadingAvailable, setLoadingAvailable] = useState(true);
   const [actionId, setActionId] = useState(null);
   const [syncingId, setSyncingId] = useState(null);
+  const [enablingAutoSyncId, setEnablingAutoSyncId] = useState(null);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const pollRef = useRef(null);
@@ -174,6 +184,19 @@ function ReposPage() {
     }
   };
 
+  const handleEnableAutoSync = async (repo) => {
+    setEnablingAutoSyncId(repo.id);
+    setError('');
+    try {
+      const res = await api.post(`/repos/${repo.id}/webhook`);
+      updateRepoSyncStatus(repo.id, { webhookId: res.data.webhookId });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setEnablingAutoSyncId(null);
+    }
+  };
+
   const handleDisconnect = async (repo) => {
     setActionId(repo.id);
     setError('');
@@ -220,8 +243,10 @@ function ReposPage() {
                 repo={repo}
                 onDisconnect={handleDisconnect}
                 onSync={handleSync}
+                onEnableAutoSync={handleEnableAutoSync}
                 disconnecting={actionId === repo.id}
                 syncing={syncingId === repo.id}
+                enablingAutoSync={enablingAutoSyncId === repo.id}
               />
             ))}
           </div>

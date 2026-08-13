@@ -36,6 +36,25 @@ export const listAvailableRepos = async (req, res, next) => {
   }
 };
 
+async function registerWebhookForRepo(user, repo) {
+  if (!config.github.webhookSecret) return null;
+
+  const [owner, repoName] = repo.fullName.split('/');
+  try {
+    const webhookId = await createRepoWebhook(
+      user.githubAccessToken,
+      owner,
+      repoName,
+      `${config.webhookBaseUrl}/api/webhooks/github`,
+      config.github.webhookSecret,
+    );
+    return prisma.repository.update({ where: { id: repo.id }, data: { webhookId } });
+  } catch (err) {
+    logger.warn(`Could not register webhook for ${repo.fullName}: ${err.message}`);
+    return null;
+  }
+}
+
 export const connectRepo = async (req, res, next) => {
   try {
     const { githubRepoId } = req.body;
@@ -56,7 +75,7 @@ export const connectRepo = async (req, res, next) => {
       return res.status(409).json({ error: 'Repository already connected' });
     }
 
-    const repo = await prisma.repository.create({
+    let repo = await prisma.repository.create({
       data: {
         userId: req.user.id,
         githubId: ghRepo.id,
@@ -70,23 +89,36 @@ export const connectRepo = async (req, res, next) => {
 
     await syncQueue.add('sync', { repositoryId: repo.id });
 
-    if (config.github.webhookSecret) {
-      const [owner, repoName] = ghRepo.full_name.split('/');
-      try {
-        const webhookId = await createRepoWebhook(
-          user.githubAccessToken,
-          owner,
-          repoName,
-          `${config.webhookBaseUrl}/api/webhooks/github`,
-          config.github.webhookSecret,
-        );
-        await prisma.repository.update({ where: { id: repo.id }, data: { webhookId } });
-      } catch (err) {
-        logger.warn(`Could not register webhook for ${ghRepo.full_name}: ${err.message}`);
-      }
-    }
+    repo = (await registerWebhookForRepo(user, repo)) ?? repo;
 
     res.status(201).json(repo);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const enableAutoSync = async (req, res, next) => {
+  try {
+    const repo = await prisma.repository.findUnique({ where: { id: req.params.id } });
+    if (!repo) return res.status(404).json({ error: 'Repository not found' });
+    if (repo.userId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+    if (repo.webhookId) return res.status(409).json({ error: 'Auto-sync is already enabled' });
+
+    if (!config.github.webhookSecret) {
+      return res.status(400).json({ error: 'Webhook registration is not configured on this server' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user?.githubAccessToken) {
+      return res.status(400).json({ error: 'GitHub account not connected' });
+    }
+
+    const updated = await registerWebhookForRepo(user, repo);
+    if (!updated) {
+      return res.status(502).json({ error: 'Could not register webhook with GitHub' });
+    }
+
+    res.json(updated);
   } catch (err) {
     next(err);
   }
