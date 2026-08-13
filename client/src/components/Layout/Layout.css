@@ -64,10 +64,15 @@
   border-bottom: 1px solid #e5e7eb;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   padding: 0 1.5rem;
   background: white;
   position: relative;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
 }
 
 .header-right {
@@ -75,6 +80,101 @@
   align-items: center;
   gap: 0.5rem;
   position: relative;
+}
+
+/* Repo switcher */
+.repo-switcher {
+  position: relative;
+}
+
+.repo-switcher-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 7px;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.85rem;
+  color: #374151;
+  cursor: pointer;
+  max-width: 260px;
+}
+
+.repo-switcher-trigger:hover {
+  background: #f9fafb;
+}
+
+.repo-switcher-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-switcher-caret {
+  color: #9ca3af;
+  font-size: 0.7rem;
+}
+
+.repo-switcher-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 280px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  z-index: 50;
+  overflow: hidden;
+}
+
+.repo-switcher-search {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.85rem;
+  box-sizing: border-box;
+}
+
+.repo-switcher-search:focus {
+  outline: none;
+}
+
+.repo-switcher-list {
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 0.35rem;
+}
+
+.repo-switcher-item {
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #374151;
+  cursor: pointer;
+}
+
+.repo-switcher-item:hover {
+  background: #f3f4f6;
+}
+
+.repo-switcher-item--active {
+  color: #2563eb;
+  font-weight: 600;
+  background: #eff6ff;
+}
+
+.repo-switcher-empty {
+  padding: 0.75rem;
+  font-size: 0.8rem;
+  color: #9ca3af;
 }
 
 /* Notification bell */

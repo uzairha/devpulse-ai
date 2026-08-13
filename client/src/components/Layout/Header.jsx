@@ -1,8 +1,75 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
 import api from '../../services/api';
 import './Layout.css';
+
+function RepoSwitcher() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [open, setOpen] = useState(false);
+  const [repos, setRepos] = useState([]);
+  const [search, setSearch] = useState('');
+  const ref = useRef(null);
+
+  useEffect(() => {
+    api.get('/repos').then((res) => setRepos(res.data)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const handleClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  if (repos.length === 0) return null;
+
+  const match = location.pathname.match(/^\/repos\/([^/]+)/);
+  const current = match && repos.find((r) => r.id === match[1]);
+  const filtered = repos.filter((r) => r.fullName.toLowerCase().includes(search.toLowerCase()));
+
+  const handleSelect = (repo) => {
+    setOpen(false);
+    setSearch('');
+    navigate(`/repos/${repo.id}`);
+  };
+
+  return (
+    <div className="repo-switcher" ref={ref}>
+      <button className="repo-switcher-trigger" onClick={() => setOpen((v) => !v)}>
+        <span className="repo-switcher-label">{current ? current.fullName : 'Jump to repo'}</span>
+        <span className="repo-switcher-caret">▾</span>
+      </button>
+      {open && (
+        <div className="repo-switcher-dropdown">
+          <input
+            className="repo-switcher-search"
+            type="text"
+            placeholder="Search repositories…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            autoFocus
+          />
+          <div className="repo-switcher-list">
+            {filtered.length === 0 ? (
+              <div className="repo-switcher-empty">No repositories match.</div>
+            ) : (
+              filtered.map((r) => (
+                <button
+                  key={r.id}
+                  className={`repo-switcher-item ${current?.id === r.id ? 'repo-switcher-item--active' : ''}`}
+                  onClick={() => handleSelect(r)}
+                >
+                  {r.fullName}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Avatar({ user }) {
   if (user.githubAvatarUrl) {
@@ -110,6 +177,9 @@ function Header() {
 
   return (
     <header className="header">
+      <div className="header-left">
+        <RepoSwitcher />
+      </div>
       <div className="header-right">
         <NotificationBell />
         <div className="avatar-wrapper" onClick={() => setMenuOpen(!menuOpen)}>
