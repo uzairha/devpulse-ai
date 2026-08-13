@@ -5,33 +5,8 @@ import { MetricsGridSkeleton } from '../components/Skeleton';
 import OnboardingSteps from '../components/OnboardingSteps';
 import { MetricCard } from '../components/MetricCard';
 import { DateRangePicker, DEFAULT_RANGE, buildRangeQuery } from '../components/DateRangePicker';
+import { ActivityChart, ThroughputChart } from '../components/ActivityChart';
 import './DashboardPage.css';
-
-function ActivityChart({ data }) {
-  if (!data || data.length === 0) return null;
-  const max = Math.max(...data.map((d) => d.count), 1);
-  // Show last 30 points max for readability
-  const visible = data.slice(-30);
-
-  return (
-    <div className="chart-wrap">
-      <div className="chart-bars">
-        {visible.map((d) => (
-          <div key={d.date} className="chart-bar-col" title={`${d.date}: ${d.count} commits`}>
-            <div
-              className="chart-bar"
-              style={{ height: `${Math.round((d.count / max) * 100)}%` }}
-            />
-          </div>
-        ))}
-      </div>
-      <div className="chart-axis">
-        <span>{visible[0]?.date.slice(5)}</span>
-        <span>{visible[visible.length - 1]?.date.slice(5)}</span>
-      </div>
-    </div>
-  );
-}
 
 function DashboardPage() {
   const { user } = useAuth();
@@ -122,6 +97,11 @@ function DashboardPage() {
                 label="Lines Changed"
                 value={`+${pr.totalAdditions} / -${pr.totalDeletions}`}
               />
+            </div>
+
+            <div className="chart-section">
+              <h3 className="chart-title">Weekly Merged PRs</h3>
+              <ThroughputChart data={pr.weeklyThroughput} />
             </div>
           </section>
 
