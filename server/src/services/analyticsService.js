@@ -44,6 +44,8 @@ export const getPrMetrics = async (repositoryId, { since, until }) => {
     until,
   );
 
+  const sizeBreakdown = buildPrSizeBreakdown(prs);
+
   return {
     total,
     merged: merged.length,
@@ -54,6 +56,7 @@ export const getPrMetrics = async (repositoryId, { since, until }) => {
     totalDeletions,
     avgReviewCount,
     weeklyThroughput,
+    sizeBreakdown,
   };
 };
 
@@ -213,6 +216,24 @@ export const getPeriodComparison = async (repositoryId, { since, until }, author
 };
 
 // Helpers
+
+const PR_SIZE_BUCKETS = [
+  { label: 'XS', max: 10 },
+  { label: 'S', max: 50 },
+  { label: 'M', max: 200 },
+  { label: 'L', max: 500 },
+  { label: 'XL', max: Infinity },
+];
+
+const buildPrSizeBreakdown = (prs) => {
+  const counts = Object.fromEntries(PR_SIZE_BUCKETS.map((b) => [b.label, 0]));
+  for (const pr of prs) {
+    const changed = pr.additions + pr.deletions;
+    const bucket = PR_SIZE_BUCKETS.find((b) => changed <= b.max);
+    counts[bucket.label]++;
+  }
+  return PR_SIZE_BUCKETS.map((b) => ({ label: b.label, count: counts[b.label] }));
+};
 
 const buildDailyBuckets = (dates, since, until) => {
   const buckets = {};

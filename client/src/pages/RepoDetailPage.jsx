@@ -5,6 +5,7 @@ import { PrTable, CommitTable } from '../components/RepoTables';
 import { MetricCard } from '../components/MetricCard';
 import { DateRangePicker, DEFAULT_RANGE, buildRangeQuery } from '../components/DateRangePicker';
 import { ActivityChart, ThroughputChart } from '../components/ActivityChart';
+import { PrSizeBreakdown } from '../components/PrSizeBreakdown';
 import './DashboardPage.css';
 import './RepoDetailPage.css';
 
@@ -203,6 +204,11 @@ function RepoDetailPage() {
                 <div className="chart-section">
                   <h3 className="chart-title">Weekly Merged PRs</h3>
                   <ThroughputChart data={pr.weeklyThroughput} />
+                </div>
+
+                <div className="chart-section">
+                  <h3 className="chart-title">PR Size Breakdown</h3>
+                  <PrSizeBreakdown data={pr.sizeBreakdown} />
                 </div>
               </section>
 
