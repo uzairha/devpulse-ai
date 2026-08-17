@@ -10,6 +10,7 @@ import DashboardPage from './pages/DashboardPage';
 import ReposPage from './pages/ReposPage';
 import RepoDetailPage from './pages/RepoDetailPage';
 import ContributorDetailPage from './pages/ContributorDetailPage';
+import ComparePage from './pages/ComparePage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 
@@ -66,6 +67,16 @@ function App() {
           <ProtectedRoute>
             <Layout>
               <ContributorDetailPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/compare"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ComparePage />
             </Layout>
           </ProtectedRoute>
         }

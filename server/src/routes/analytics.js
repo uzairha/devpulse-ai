@@ -2,11 +2,18 @@ import { Router } from 'express';
 import { param, query } from 'express-validator';
 import requireAuth from '../middleware/requireAuth.js';
 import validate from '../middleware/validate.js';
-import { getRepoAnalytics, listPullRequests, listCommits, getContributor } from '../controllers/analyticsController.js';
+import { getRepoAnalytics, compareRepos, listPullRequests, listCommits, getContributor } from '../controllers/analyticsController.js';
 
 const router = Router();
 
 router.use(requireAuth);
+
+router.get(
+  '/compare',
+  [query('days').optional().isInt({ min: 1, max: 365 }).withMessage('days must be 1–365')],
+  validate,
+  compareRepos,
+);
 
 router.get(
   '/:id',

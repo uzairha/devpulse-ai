@@ -3,8 +3,10 @@ import {
   getPrMetrics,
   getCommitMetrics,
   getContributorSummary,
+  getContributorLeaderboard,
   getPeriodComparison,
 } from '../services/analyticsService.js';
+import { calculateHealthScore } from '../services/aiService.js';
 import { getCached, setCached } from '../lib/cache.js';
 
 const MAX_RANGE_DAYS = 365;
@@ -53,10 +55,11 @@ export const getRepoAnalytics = async (req, res, next) => {
     const cached = await getCached(cacheKey);
     if (cached) return res.json(cached);
 
-    const [prMetrics, commitMetrics, trends] = await Promise.all([
+    const [prMetrics, commitMetrics, trends, leaderboard] = await Promise.all([
       getPrMetrics(repo.id, range),
       getCommitMetrics(repo.id, range),
       getPeriodComparison(repo.id, range),
+      getContributorLeaderboard(repo.id, range),
     ]);
 
     const payload = {
@@ -66,6 +69,60 @@ export const getRepoAnalytics = async (req, res, next) => {
       prMetrics,
       commitMetrics,
       trends,
+      leaderboard,
+    };
+    await setCached(cacheKey, payload);
+    res.json(payload);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const compareRepos = async (req, res, next) => {
+  try {
+    const range = resolveRange(req.query);
+    if (!range) return res.status(400).json({ error: 'Invalid date range' });
+
+    const cacheKey = `analytics:compare:${req.user.id}:${rangeCacheKey(range)}`;
+    const cached = await getCached(cacheKey);
+    if (cached) return res.json(cached);
+
+    const repos = await prisma.repository.findMany({
+      where: { userId: req.user.id },
+      select: { id: true, fullName: true, language: true, lastSyncAt: true },
+      orderBy: { fullName: 'asc' },
+    });
+
+    const repoSummaries = await Promise.all(
+      repos.map(async (repo) => {
+        const [pr, cm, health] = await Promise.all([
+          getPrMetrics(repo.id, range),
+          getCommitMetrics(repo.id, range),
+          calculateHealthScore(repo.id),
+        ]);
+
+        return {
+          repo: { id: repo.id, fullName: repo.fullName, language: repo.language, lastSyncAt: repo.lastSyncAt },
+          prCount: pr.total,
+          mergedCount: pr.merged,
+          mergeRate: pr.mergeRate,
+          openCount: pr.open,
+          avgTimeToMergeHours: pr.avgTimeToMergeHours,
+          commitCount: cm.total,
+          contributorCount: cm.contributorCount,
+          additions: pr.totalAdditions + cm.totalAdditions,
+          deletions: pr.totalDeletions + cm.totalDeletions,
+          healthScore: health.score,
+        };
+      }),
+    );
+
+    repoSummaries.sort((a, b) => b.prCount + b.commitCount - (a.prCount + a.commitCount));
+
+    const payload = {
+      startDate: range.since.toISOString().slice(0, 10),
+      endDate: range.until.toISOString().slice(0, 10),
+      repos: repoSummaries,
     };
     await setCached(cacheKey, payload);
     res.json(payload);

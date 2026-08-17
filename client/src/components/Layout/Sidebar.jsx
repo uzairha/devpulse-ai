@@ -4,6 +4,7 @@ import './Layout.css';
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: '▦' },
   { to: '/repos', label: 'Repositories', icon: '⌥' },
+  { to: '/compare', label: 'Compare', icon: '⇄' },
   { to: '/reports', label: 'Reports', icon: '◈' },
   { to: '/settings', label: 'Settings', icon: '⚙' },
 ];

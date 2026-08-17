@@ -1,0 +1,16 @@
+.compare-page {
+  max-width: 1000px;
+}
+
+.compare-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+}
+
+.compare-health {
+  font-weight: 700;
+}
