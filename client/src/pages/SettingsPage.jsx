@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import useAuth from '../hooks/useAuth';
+import useTheme from '../hooks/useTheme';
 import api from '../services/api';
 import './SettingsPage.css';
 
 function SettingsPage() {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [weeklyReport, setWeeklyReport] = useState(user?.weeklyReportEmail ?? true);
   const [syncNotifs, setSyncNotifs] = useState(user?.syncNotifications ?? true);
   const [saving, setSaving] = useState(false);
@@ -34,6 +36,26 @@ function SettingsPage() {
       <div className="settings-header">
         <h1 className="settings-title">Settings</h1>
       </div>
+
+      <section className="settings-section">
+        <h2 className="settings-section-title">Appearance</h2>
+        <div className="settings-card">
+          <div className="settings-row">
+            <div>
+              <div className="settings-row-label">Dark mode</div>
+              <div className="settings-row-hint">Switch between light and dark theme</div>
+            </div>
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={theme === 'dark'}
+                onChange={toggleTheme}
+              />
+              <span className="toggle-slider" />
+            </label>
+          </div>
+        </div>
+      </section>
 
       <section className="settings-section">
         <h2 className="settings-section-title">Account</h2>

@@ -1,5 +1,147 @@
 # Development Log
 
+## Week 4, Day 20 (cont.) — Task 90 — 2026-08-17
+
+### Tasks Completed
+- [x] Task 90 — Dark mode toggle
+
+### Approach
+Retrofitted the app's ~2,300 lines of hardcoded-hex CSS onto a small set of semantic custom-property tokens (`--bg`, `--text`, `--border`, `--accent`, `--success`, `--warning`, `--danger`, `--purple`, plus `-bg`/`-hover`/`-strong`/`-subtle` variants of each), defined once in `client/src/index.css` under `:root` (light values) and overridden under `[data-theme='dark']`. Values were mapped mechanically (same hex → same token everywhere, since it was already a small consistent Tailwind-gray/blue/red/green/purple palette) then applied via a scripted `sed` pass across every CSS file, followed by manual review.
+
+### Files Modified/Created
+- `client/src/index.css` — full token set (light + dark), replaces the old hardcoded `body` color/background.
+- All other `client/src/**/*.css` (13 files) — hardcoded hex values swapped for `var(--token)` equivalents via scripted substitution, then hand-reviewed.
+- `client/src/context/ThemeContext.jsx` / `client/src/hooks/useTheme.js` (new) — same Provider+hook shape as the existing `AuthContext`/`useAuth`. Initializes from `localStorage` (`devpulse-theme`) or `prefers-color-scheme` if nothing stored; sets `data-theme` on `<html>`; toggling persists to `localStorage`.
+- `client/src/main.jsx` — wraps the app in `ThemeProvider` (outside `AuthProvider`, so the theme applies even on the login/landing pages).
+- `client/src/components/Layout/Header.jsx` / `Layout.css` — new `ThemeToggle` button (☀/☾) next to the notification bell.
+- `client/src/pages/SettingsPage.jsx` — new "Appearance" section with a Dark mode toggle (reuses the existing `.toggle` switch component), kept in sync with the header button via the shared `useTheme` hook.
+- `client/src/pages/ComparePage.jsx`, `RepoDetailPage.jsx`, `components/ErrorBoundary.jsx` — inline JS-computed hex colors (health-score bands, error boundary styling) switched to the same `var(--token)` values so they respect the theme too.
+
+### Two bugs caught before shipping
+1. The initial blind `color: white` → `var(--bg)` mapping was wrong for text sitting on colored surfaces (buttons, badges, chat bubbles, avatar initials) — in dark mode `--bg` becomes a dark color, so button text would have gone dark-on-dark. Fixed by adding a dedicated `--on-accent` token (always white, not redefined in the dark block) and remapping those ~15 call sites to it.
+2. The sidebar (`Layout.css` `.sidebar`) is intentionally a fixed dark surface in both themes (matches the pre-existing design). The mechanical sed pass initially pointed its background/hover-text at flipping tokens (`--text`/`--bg-subtle`), which would have inverted the sidebar to near-white in dark mode. Fixed by reverting those two declarations to literal hex, matching the sidebar's other already-hardcoded colors (`#1f2937`, `#1e3a5f`, `#60a5fa`) which were correctly left untouched by the mapping.
+
+### Scope decisions
+- Sidebar stays permanently dark regardless of app theme (unchanged design).
+- GitHub OAuth button on the login page keeps its literal brand colors (`#24292e`/`#1a1e22`), not tokenized.
+- Landing and login/register pages are included (the `ThemeProvider` wraps the whole app, not just the authenticated `Layout`), so the toggle preference applies everywhere, though there's no toggle control on those pages themselves.
+
+### Tests Added
+- None. Verified in-browser: toggled via both the header button and the Settings switch (stay in sync), confirmed correct light/dark rendering on Dashboard, RepoDetail (Overview/Chat tabs, health score card), Repositories, Compare, and Settings; confirmed the app respects `prefers-color-scheme` on first load with nothing in `localStorage`; no console errors in either theme.
+
+### Known Issues
+- Same carryover as Day 19/89 (`redis.keys()` cache invalidation, 100-row export cap, compare-view cache not invalidated on sync).
+
+### Next: Week 4, Task 91+
+- TBD — pick at next session start.
+
+---
+
+## Week 4, Day 20 (cont.) — Task 89 — 2026-08-17
+
+### Tasks Completed
+- [x] Task 89 — Cross-repo comparison view
+
+### Files Modified/Created
+- `server/src/controllers/analyticsController.js` — new `compareRepos`: resolves the date range same as `getRepoAnalytics`, fetches all of the authenticated user's repos, and for each runs `getPrMetrics`/`getCommitMetrics` (existing) plus `calculateHealthScore` (imported from `aiService.js` — deterministic, no LLM call, always a fixed last-30-days window regardless of the requested range, same as the existing per-repo Health Score card) in parallel. Sorts repos by combined PR+commit activity descending. Cached under `analytics:compare:<userId>:<range>` (same TTL/pattern as other analytics endpoints).
+- `server/src/routes/analytics.js` — `GET /api/analytics/compare?days=` (or `?startDate=&endDate=`), registered before `/:id` so it isn't swallowed by the UUID param route.
+- `client/src/pages/ComparePage.jsx` / `ComparePage.css` (new) — table of all connected repos (reuses `.data-table` styling from `RepoDetailPage.css`) with columns: Health (color-coded green/amber/red, same thresholds as the existing Health Score card), PRs, Merge Rate, Avg Merge Time, Commits, Contributors, Lines Changed. Repo name links to its detail page. Reuses `DateRangePicker`.
+- `client/src/App.jsx` / `client/src/components/Layout/Sidebar.jsx` — new `/compare` route and sidebar nav entry ("Compare", ⇄ icon) between Repositories and Reports.
+
+### Tests Added
+- None. Verified in-browser: table renders both seeded repos with correct health/PR/commit figures, repo-name link navigates to the right detail page, custom date range confirmed directly against the API (`GET /api/analytics/compare?startDate=2026-06-01&endDate=2026-08-17` → 200, correct per-repo counts), no console errors.
+
+### Known Issues
+- The compare view's Redis cache key (`analytics:compare:<userId>:*`) isn't cleared by `invalidateRepoCache` (which only clears `analytics:<repoId>:*`) — a sync completing won't immediately refresh the compare page's cache the way it does for the per-repo pages. Bounded by the existing 120s TTL, so treated as acceptable for now, consistent with the standing decision on the `redis.keys()` cache-invalidation known issue.
+- Same carryover otherwise (100-row export cap).
+
+### Next: Week 4, Task 90+
+- Dark mode toggle — chosen and done later the same session (2026-08-17), see the Task 90 entry above.
+
+---
+
+## Week 4, Day 20 — 2026-08-17
+
+### Tasks Completed
+- [x] Task 88 — Contributor leaderboard widget
+
+### Files Modified/Created
+- `server/src/services/analyticsService.js` — new `getContributorLeaderboard(repositoryId, { since, until })`: queries PRs and commits in the range, groups by `authorLogin` into `{ login, prCount, mergedPrCount, commitCount, additions, deletions }`, sorts by `prCount + commitCount` descending, returns top 10. (Combining PR and commit lines in one total follows the same convention already used in `getContributorSummary`.)
+- `server/src/controllers/analyticsController.js` — `getRepoAnalytics` now also calls `getContributorLeaderboard` and adds a `leaderboard` key to the response (same cache entry/TTL as the rest of the payload).
+- `client/src/components/ContributorLeaderboard.jsx` (new) — ranked rows (🥇🥈🥉 for top 3, `#N` after that), each linking to the contributor detail page, showing PR count / commit count / lines changed.
+- `client/src/pages/DashboardPage.jsx` / `RepoDetailPage.jsx` — new "Contributor Leaderboard" section added after the Commits section; replaces the old 5-item, commits-only "Top Contributors" list (which is now redundant — the leaderboard shows the same contributors ranked by combined PR+commit activity, with more detail). The `commitMetrics.topContributors` field is still returned by the API, just no longer rendered.
+- `client/src/pages/DashboardPage.css` — new `.leaderboard`, `.leaderboard-row`, `.leaderboard-rank`, `.leaderboard-login`, `.leaderboard-stat`, `.leaderboard-lines` (shared by Dashboard and RepoDetail, same file the other widget styles already live in).
+
+### Tests Added
+- None. Verified in-browser (claude-in-chrome) on both Dashboard and RepoDetail pages against testuser/frontend-app: leaderboard renders with correct rank/PR/commit/line counts, row links to `/repos/:id/contributors/:login` and navigates correctly, no console errors.
+
+### Known Issues
+- Same carryover as Day 19 (`redis.keys()` cache invalidation, 100-row export cap).
+
+### Next: Week 4, Task 89+
+- Cross-repo comparison view — chosen and done later the same session (2026-08-17), see entry above.
+
+---
+
+## Week 4, Day 19 — 2026-08-12
+
+### Tasks Completed
+- [x] Task 83 — Retroactive webhook registration for pre-Task-71 repos
+- [x] Task 84 — Weekly PR throughput chart, extracted shared `ActivityChart` component
+- [x] Task 85 — Confirmation modal before disconnecting a repository
+- [x] Task 86 — Repo quick-switcher in header
+- [x] Task 87 — PR size breakdown widget on repo detail page
+
+### Files Modified/Created
+- `server/src/controllers/repoController.js` — extracted webhook-registration logic out of `connectRepo` into a shared `registerWebhookForRepo(user, repo)` helper; new `enableAutoSync` controller action lets a repo connected before Task 71 register a webhook on demand (404 if not found, 403 if not owned, 409 if already enabled, 400 if webhooks aren't configured server-side or the user has no GitHub token, 502 if GitHub registration fails).
+- `server/src/routes/repos.js` — `POST /api/repos/:id/webhook` wired to `enableAutoSync`.
+- `client/src/pages/ReposPage.jsx` / `.css` — repo cards without a webhook now show an "Enable auto-sync" button calling the new endpoint; swaps to the existing "⚡ Auto-sync" badge on success.
+- `client/src/components/ActivityChart.jsx` (new) — extracted the existing daily-commits bar chart into `ActivityChart`, plus a new `ThroughputChart` (SVG line chart) for weekly merged-PR counts. Both replace duplicated inline chart markup in `DashboardPage.jsx`/`RepoDetailPage.jsx`.
+- `server/src/services/analyticsService.js` — `getPrMetrics` gained a `sizeBreakdown` field: PRs bucketed into XS/S/M/L/XL by `additions + deletions` (≤10 / ≤50 / ≤200 / ≤500 / 500+ lines) via new `buildPrSizeBreakdown` helper.
+- `client/src/components/PrSizeBreakdown.jsx` (new) — horizontal bar-per-bucket widget rendering `sizeBreakdown`, wired into `RepoDetailPage.jsx`.
+- `client/src/components/ConfirmModal.jsx` / `.css` (new) — generic confirm/cancel modal; `ReposPage.jsx`'s disconnect button now opens it instead of disconnecting immediately.
+- `client/src/components/Layout/Header.jsx` / `Layout.css` — new repo quick-switcher dropdown in the header for jumping between connected repos without going back to the Repos list.
+
+### Tests Added
+- None — manual verification only (no automated test suite yet in this project). Not re-verified in-browser this session; carried over from the original working session on 2026-08-12.
+
+### Known Issues
+- Same carryover as Day 17: `redis.keys()` cache invalidation pattern, export capped at 100 rows.
+
+### Week 4 Day 19 Summary
+Five tasks in one session: closed out the last Week 3 known issue (retroactive webhooks), added two new analytics visualizations (weekly PR throughput, PR size breakdown), and two UX polish items (disconnect confirmation, repo quick-switcher).
+
+### Next: Week 4, Task 88+
+- Contributor leaderboard widget (ranks contributors by PR/commit volume) — chosen at start of next session.
+
+---
+
+## Week 4, Day 18 — 2026-08-11
+
+### Tasks Completed
+- [x] Task 82 — Custom date-range picker for analytics (replaces fixed 7d/30d/90d presets)
+
+### Files Modified/Created
+- `server/src/services/analyticsService.js` — refactored from `days`-based (`getDaysAgo`) to `{ since, until }` date-range signatures across `getPrMetrics`, `getCommitMetrics`, `getContributorSummary`, `getPeriodComparison`, and the `buildDailyBuckets`/`buildWeeklyBuckets` helpers (now iterate the actual since→until span instead of assuming "now" as the end). `getPeriodComparison`'s previous-period window is `[since - (until-since), since)`.
+- `server/src/controllers/analyticsController.js` — new `resolveRange(query)` parses `?days=N` (preset) or `?startDate=&endDate=` (custom, `YYYY-MM-DD`), clamps to `MAX_RANGE_DAYS = 365` and `until <= now`, 400s on invalid input. Cache key suffix changed from `:${days}` to `:${sinceISODate}:${untilISODate}`. Response now returns `startDate`/`endDate` instead of `days`.
+- `client/src/components/DateRangePicker.jsx` (new) — exports `DateRangePicker`, `DEFAULT_RANGE`, `buildRangeQuery`; replaces the per-page preset tabs in Dashboard/RepoDetail/ContributorDetail with a shared component, adds a "Custom" toggle revealing two `<input type="date">` fields.
+- `client/src/pages/DashboardPage.css` — shared styles: `.date-range-picker`, `.custom-range-inputs`, `.date-input`, `.date-range-sep`.
+- `RepoDetailPage.jsx` export filename changed from `...-analytics-${days}d.json` to `...-analytics-${startDate}_to_${endDate}.json`.
+
+### Bug Fixed Before Shipping
+- Date inputs must not be controlled directly by the committed `range.startDate`/`range.endDate` — since the parent's `onChange`/refetch only fires once both dates are valid, a directly-controlled input snapped back to empty the instant only one date was set. Fixed with local `draftStart`/`draftEnd` state that holds each field independently; the parent only commits once both drafts are valid dates with start ≤ end.
+
+### Tests Added
+- None. Verified end-to-end in-browser (claude-in-chrome) on all 3 pages: preset↔custom toggle, draft-state fix, metrics/trends refetch correctly for a custom range, export filename, no console errors.
+
+### Known Issues
+- Same carryover as Day 17 (`redis.keys()` cache invalidation, retroactive webhooks — the latter fixed the next day in Task 83).
+
+### Next: Week 4, Task 83+
+- Retroactive webhook registration for pre-Task-71 repos (deferred from Day 17).
+
+---
+
 ## Week 4, Day 17 — 2026-08-09
 
 ### Tasks Completed

@@ -7,6 +7,8 @@
 .sidebar {
   width: 240px;
   flex-shrink: 0;
+  /* Sidebar stays a fixed dark surface regardless of app theme, so its
+     colors are literal, not theme tokens. */
   background: #111827;
   color: #f9fafb;
   display: flex;
@@ -17,7 +19,7 @@
 .sidebar-logo {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #2563eb;
+  color: var(--accent);
   padding: 0 1.5rem 1.5rem;
   border-bottom: 1px solid #1f2937;
 }
@@ -35,7 +37,7 @@
   gap: 0.75rem;
   padding: 0.625rem 0.875rem;
   border-radius: 8px;
-  color: #9ca3af;
+  color: var(--text-faint);
   text-decoration: none;
   font-size: 0.9rem;
   font-weight: 500;
@@ -61,12 +63,12 @@
 /* Header */
 .header {
   height: 60px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 1.5rem;
-  background: white;
+  background: var(--bg);
   position: relative;
 }
 
@@ -92,17 +94,17 @@
   align-items: center;
   gap: 0.4rem;
   background: none;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 7px;
   padding: 0.4rem 0.7rem;
   font-size: 0.85rem;
-  color: #374151;
+  color: var(--text-secondary);
   cursor: pointer;
   max-width: 260px;
 }
 
 .repo-switcher-trigger:hover {
-  background: #f9fafb;
+  background: var(--bg-subtle);
 }
 
 .repo-switcher-label {
@@ -112,7 +114,7 @@
 }
 
 .repo-switcher-caret {
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 0.7rem;
 }
 
@@ -121,8 +123,8 @@
   top: calc(100% + 6px);
   left: 0;
   width: 280px;
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   z-index: 50;
@@ -132,7 +134,7 @@
 .repo-switcher-search {
   width: 100%;
   border: none;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
   padding: 0.6rem 0.75rem;
   font-size: 0.85rem;
   box-sizing: border-box;
@@ -157,24 +159,41 @@
   padding: 0.5rem 0.6rem;
   border-radius: 6px;
   font-size: 0.85rem;
-  color: #374151;
+  color: var(--text-secondary);
   cursor: pointer;
 }
 
 .repo-switcher-item:hover {
-  background: #f3f4f6;
+  background: var(--bg-hover);
 }
 
 .repo-switcher-item--active {
-  color: #2563eb;
+  color: var(--accent);
   font-weight: 600;
-  background: #eff6ff;
+  background: var(--accent-bg);
 }
 
 .repo-switcher-empty {
   padding: 0.75rem;
   font-size: 0.8rem;
-  color: #9ca3af;
+  color: var(--text-faint);
+}
+
+/* Theme toggle */
+.theme-toggle-btn {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.35rem;
+  border-radius: 7px;
+  line-height: 1;
+  color: var(--text-secondary);
+  transition: background 0.15s;
+}
+
+.theme-toggle-btn:hover {
+  background: var(--bg-hover);
 }
 
 /* Notification bell */
@@ -195,15 +214,15 @@
 }
 
 .notif-bell:hover {
-  background: #f3f4f6;
+  background: var(--bg-hover);
 }
 
 .notif-badge {
   position: absolute;
   top: 0;
   right: 0;
-  background: #dc2626;
-  color: white;
+  background: var(--danger-strong);
+  color: var(--on-accent);
   font-size: 0.6rem;
   font-weight: 700;
   min-width: 16px;
@@ -220,8 +239,8 @@
   top: calc(100% + 8px);
   right: 0;
   width: 340px;
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.1);
   z-index: 200;
@@ -233,20 +252,20 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.875rem 1rem;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--bg-hover);
 }
 
 .notif-title {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text);
 }
 
 .notif-mark-all {
   background: none;
   border: none;
   font-size: 0.75rem;
-  color: #2563eb;
+  color: var(--accent);
   cursor: pointer;
   padding: 0;
 }
@@ -259,7 +278,7 @@
 .notif-empty {
   padding: 1.5rem;
   text-align: center;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 0.875rem;
 }
 
@@ -267,18 +286,18 @@
   display: flex;
   gap: 0.75rem;
   padding: 0.875rem 1rem;
-  border-bottom: 1px solid #f9fafb;
+  border-bottom: 1px solid var(--bg-subtle);
   cursor: default;
   transition: background 0.1s;
 }
 
 .notif-item--unread {
-  background: #f8faff;
+  background: var(--accent-bg-subtle);
   cursor: pointer;
 }
 
 .notif-item--unread:hover {
-  background: #eff6ff;
+  background: var(--accent-bg);
 }
 
 .notif-icon {
@@ -294,27 +313,27 @@
   margin-top: 1px;
 }
 
-.notif-icon--ok   { background: #dcfce7; color: #15803d; }
-.notif-icon--fail { background: #fee2e2; color: #b91c1c; }
+.notif-icon--ok   { background: var(--success-bg); color: var(--success); }
+.notif-icon--fail { background: var(--danger-bg-strong); color: var(--danger); }
 
 .notif-content { flex: 1; min-width: 0; }
 
 .notif-item-title {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text);
 }
 
 .notif-item-body {
   font-size: 0.775rem;
-  color: #6b7280;
+  color: var(--text-muted);
   margin-top: 0.15rem;
   line-height: 1.4;
 }
 
 .notif-item-time {
   font-size: 0.7rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin-top: 0.25rem;
 }
 
@@ -329,7 +348,7 @@
 }
 
 .avatar-wrapper:hover {
-  background: #f3f4f6;
+  background: var(--bg-hover);
 }
 
 .avatar-img {
@@ -343,8 +362,8 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #2563eb;
-  color: white;
+  background: var(--accent);
+  color: var(--on-accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -355,15 +374,15 @@
 .avatar-name {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-secondary);
 }
 
 .avatar-dropdown {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   min-width: 140px;
@@ -377,13 +396,13 @@
   background: none;
   border: none;
   font-size: 0.875rem;
-  color: #374151;
+  color: var(--text-secondary);
   cursor: pointer;
   border-radius: 8px;
 }
 
 .avatar-dropdown button:hover {
-  background: #f3f4f6;
+  background: var(--bg-hover);
 }
 
 /* Main content */
@@ -391,7 +410,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #f9fafb;
+  background: var(--bg-subtle);
   overflow: hidden;
 }
 

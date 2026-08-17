@@ -1,8 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
+import useTheme from '../../hooks/useTheme';
 import api from '../../services/api';
 import './Layout.css';
+
+function ThemeToggle() {
+  const { theme, toggleTheme } = useTheme();
+  return (
+    <button
+      className="theme-toggle-btn"
+      onClick={toggleTheme}
+      aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      {theme === 'dark' ? '☀' : '☾'}
+    </button>
+  );
+}
 
 function RepoSwitcher() {
   const navigate = useNavigate();
@@ -181,6 +196,7 @@ function Header() {
         <RepoSwitcher />
       </div>
       <div className="header-right">
+        <ThemeToggle />
         <NotificationBell />
         <div className="avatar-wrapper" onClick={() => setMenuOpen(!menuOpen)}>
           <Avatar user={user} />

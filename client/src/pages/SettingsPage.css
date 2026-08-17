@@ -9,7 +9,7 @@
 .settings-title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text);
   margin: 0;
 }
 
@@ -20,21 +20,21 @@
 .settings-section-title {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin: 0 0 0.75rem;
 }
 
 .settings-card {
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
 }
 
 .settings-card--danger {
-  border-color: #fecaca;
+  border-color: var(--danger-border);
 }
 
 .settings-row {
@@ -46,34 +46,34 @@
 }
 
 .settings-divider {
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid var(--bg-hover);
 }
 
 .settings-row-label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #111827;
+  color: var(--text);
 }
 
 .settings-row-value {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-muted);
   margin-top: 0.125rem;
 }
 
 .settings-row-hint {
   font-size: 0.8rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin-top: 0.125rem;
 }
 
 .github-connected {
-  color: #15803d;
+  color: var(--success);
   font-weight: 500;
 }
 
 .github-disconnected {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 /* Toggle switch */
@@ -94,7 +94,7 @@
 .toggle-slider {
   position: absolute;
   inset: 0;
-  background: #d1d5db;
+  background: var(--border-strong);
   border-radius: 24px;
   cursor: pointer;
   transition: background 0.2s;
@@ -106,7 +106,7 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: white;
+  background: var(--bg);
   top: 3px;
   left: 3px;
   transition: transform 0.2s;
@@ -114,7 +114,7 @@
 }
 
 .toggle input:checked + .toggle-slider {
-  background: #2563eb;
+  background: var(--accent);
 }
 
 .toggle input:checked + .toggle-slider::before {
@@ -141,37 +141,37 @@
 }
 
 .settings-btn--primary {
-  background: #2563eb;
-  color: white;
+  background: var(--accent);
+  color: var(--on-accent);
   margin-top: 0.75rem;
 }
 
 .settings-btn--primary:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: var(--accent-hover);
 }
 
 .settings-btn--secondary {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
 }
 
 .settings-btn--secondary:hover {
-  background: #e5e7eb;
+  background: var(--border);
 }
 
 .settings-btn--danger {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: var(--danger-bg-strong);
+  color: var(--danger);
 }
 
 .settings-btn--danger:hover {
-  background: #fecaca;
+  background: var(--danger-border);
 }
 
 .settings-error {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #b91c1c;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger);
   border-radius: 7px;
   padding: 0.6rem 1rem;
   font-size: 0.8rem;
@@ -179,9 +179,9 @@
 }
 
 .settings-success {
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: #15803d;
+  background: var(--success-bg-subtle);
+  border: 1px solid var(--success-border);
+  color: var(--success);
   border-radius: 7px;
   padding: 0.6rem 1rem;
   font-size: 0.8rem;
