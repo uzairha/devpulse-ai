@@ -6,6 +6,7 @@ import { MetricCard } from '../components/MetricCard';
 import { DateRangePicker, DEFAULT_RANGE, buildRangeQuery } from '../components/DateRangePicker';
 import { ActivityChart, ThroughputChart } from '../components/ActivityChart';
 import { PrSizeBreakdown } from '../components/PrSizeBreakdown';
+import { ContributorLeaderboard } from '../components/ContributorLeaderboard';
 import './DashboardPage.css';
 import './RepoDetailPage.css';
 
@@ -80,9 +81,9 @@ function HealthScoreCard({ repoId }) {
 
   if (!health) return null;
 
-  const color = health.score >= 75 ? '#15803d' : health.score >= 50 ? '#d97706' : '#b91c1c';
-  const bg    = health.score >= 75 ? '#f0fdf4' : health.score >= 50 ? '#fffbeb' : '#fef2f2';
-  const border= health.score >= 75 ? '#bbf7d0' : health.score >= 50 ? '#fde68a' : '#fecaca';
+  const color = health.score >= 75 ? 'var(--success)' : health.score >= 50 ? 'var(--warning)' : 'var(--danger)';
+  const bg    = health.score >= 75 ? 'var(--success-bg-subtle)' : health.score >= 50 ? 'var(--warning-bg)' : 'var(--danger-bg)';
+  const border= health.score >= 75 ? 'var(--success-border)' : health.score >= 50 ? 'var(--warning-border)' : 'var(--danger-border)';
 
   return (
     <div className="health-card" style={{ background: bg, borderColor: border }}>
@@ -120,7 +121,7 @@ function RepoDetailPage() {
       .finally(() => setLoading(false));
   }, [id, range]);
 
-  const { prMetrics: pr, commitMetrics: cm, trends, repo } = analytics || {};
+  const { prMetrics: pr, commitMetrics: cm, trends, leaderboard, repo } = analytics || {};
 
   return (
     <div className="dashboard">
@@ -220,29 +221,20 @@ function RepoDetailPage() {
                   <MetricCard label="Lines Changed" value={`+${cm.totalAdditions} / -${cm.totalDeletions}`} />
                 </div>
 
-                {cm.topContributors.length > 0 && (
-                  <div className="contributors">
-                    <h3 className="contributors-title">Top Contributors</h3>
-                    <div className="contributors-list">
-                      {cm.topContributors.map((c) => (
-                        <Link
-                          key={c.login}
-                          to={`/repos/${id}/contributors/${encodeURIComponent(c.login)}`}
-                          className="contributor-row contributor-row--link"
-                        >
-                          <span className="contributor-login">{c.login}</span>
-                          <span className="contributor-count">{c.count} commits</span>
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 <div className="chart-section">
                   <h3 className="chart-title">Daily Commit Activity</h3>
                   <ActivityChart data={cm.dailyActivity} />
                 </div>
               </section>
+
+              {leaderboard?.length > 0 && (
+                <section className="dash-section">
+                  <h2 className="dash-section-title">Contributor Leaderboard</h2>
+                  <div className="contributors">
+                    <ContributorLeaderboard data={leaderboard} repoId={id} />
+                  </div>
+                </section>
+              )}
             </>
           )}
 

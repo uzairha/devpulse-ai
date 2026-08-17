@@ -139,6 +139,55 @@ export const getContributorSummary = async (repositoryId, login, { since, until 
   };
 };
 
+export const getContributorLeaderboard = async (repositoryId, { since, until }) => {
+  const [prs, commits] = await Promise.all([
+    prisma.pullRequest.findMany({
+      where: { repositoryId, createdAt: { gte: since, lte: until } },
+      select: { authorLogin: true, mergedAt: true, additions: true, deletions: true },
+    }),
+    prisma.commit.findMany({
+      where: { repositoryId, committedAt: { gte: since, lte: until } },
+      select: { authorLogin: true, additions: true, deletions: true },
+    }),
+  ]);
+
+  const byAuthor = {};
+  const entryFor = (login) => {
+    if (!byAuthor[login]) {
+      byAuthor[login] = {
+        login,
+        prCount: 0,
+        mergedPrCount: 0,
+        commitCount: 0,
+        additions: 0,
+        deletions: 0,
+      };
+    }
+    return byAuthor[login];
+  };
+
+  for (const pr of prs) {
+    if (!pr.authorLogin) continue;
+    const entry = entryFor(pr.authorLogin);
+    entry.prCount++;
+    if (pr.mergedAt) entry.mergedPrCount++;
+    entry.additions += pr.additions;
+    entry.deletions += pr.deletions;
+  }
+
+  for (const c of commits) {
+    if (!c.authorLogin) continue;
+    const entry = entryFor(c.authorLogin);
+    entry.commitCount++;
+    entry.additions += c.additions;
+    entry.deletions += c.deletions;
+  }
+
+  return Object.values(byAuthor)
+    .sort((a, b) => b.prCount + b.commitCount - (a.prCount + a.commitCount))
+    .slice(0, 10);
+};
+
 export const getPeriodComparison = async (repositoryId, { since, until }, authorLogin = null) => {
   const periodStart = since;
   const previousStart = new Date(since.getTime() - (until.getTime() - since.getTime()));

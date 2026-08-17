@@ -6,6 +6,7 @@ import OnboardingSteps from '../components/OnboardingSteps';
 import { MetricCard } from '../components/MetricCard';
 import { DateRangePicker, DEFAULT_RANGE, buildRangeQuery } from '../components/DateRangePicker';
 import { ActivityChart, ThroughputChart } from '../components/ActivityChart';
+import { ContributorLeaderboard } from '../components/ContributorLeaderboard';
 import './DashboardPage.css';
 
 function DashboardPage() {
@@ -35,7 +36,7 @@ function DashboardPage() {
       .finally(() => setLoading(false));
   }, [selectedId, range]);
 
-  const { prMetrics: pr, commitMetrics: cm, trends } = analytics || {};
+  const { prMetrics: pr, commitMetrics: cm, trends, leaderboard } = analytics || {};
 
   return (
     <div className="dashboard">
@@ -116,25 +117,20 @@ function DashboardPage() {
               />
             </div>
 
-            {cm.topContributors.length > 0 && (
-              <div className="contributors">
-                <h3 className="contributors-title">Top Contributors</h3>
-                <div className="contributors-list">
-                  {cm.topContributors.map((c) => (
-                    <div key={c.login} className="contributor-row">
-                      <span className="contributor-login">{c.login}</span>
-                      <span className="contributor-count">{c.count} commits</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <div className="chart-section">
               <h3 className="chart-title">Daily Commit Activity</h3>
               <ActivityChart data={cm.dailyActivity} />
             </div>
           </section>
+
+          {leaderboard?.length > 0 && (
+            <section className="dash-section">
+              <h2 className="dash-section-title">Contributor Leaderboard</h2>
+              <div className="contributors">
+                <ContributorLeaderboard data={leaderboard} repoId={selectedId} />
+              </div>
+            </section>
+          )}
         </>
       )}
     </div>
