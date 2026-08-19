@@ -17,16 +17,17 @@ const processSync = async (job) => {
   });
 
   if (!repo) throw new Error(`Repository ${repositoryId} not found`);
-  if (!repo.user.githubAccessToken) throw new Error('No GitHub access token');
 
   const syncJob = await prisma.syncJob.create({
     data: { repositoryId, status: 'running', startedAt: new Date() },
   });
 
-  const [owner, repoName] = repo.fullName.split('/');
-  const token = repo.user.githubAccessToken;
-
   try {
+    if (!repo.user.githubAccessToken) throw new Error('No GitHub access token');
+
+    const [owner, repoName] = repo.fullName.split('/');
+    const token = repo.user.githubAccessToken;
+
     const [prs, commits] = await Promise.all([
       getRepoPullRequests(token, owner, repoName),
       getRepoCommits(token, owner, repoName),
@@ -106,6 +107,7 @@ const processSync = async (job) => {
         type: 'sync_complete',
         title: 'Sync complete',
         body: `${repo.fullName} synced — ${prs.length} PRs and ${commits.length} commits imported.`,
+        link: `/repos/${repositoryId}`,
       });
     }
   } catch (err) {
@@ -119,6 +121,7 @@ const processSync = async (job) => {
         type: 'sync_failed',
         title: 'Sync failed',
         body: `${repo.fullName} sync failed: ${err.message}`,
+        link: `/repos/${repositoryId}`,
       }).catch(() => {});
     }
 

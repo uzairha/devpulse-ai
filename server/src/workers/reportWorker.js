@@ -25,6 +25,7 @@ const processWeeklyReports = async () => {
         type: 'weekly_report',
         title: 'Weekly report ready',
         body: `Your weekly digest for ${repo.fullName} is ready to view.`,
+        link: `/reports?repo=${repo.id}`,
       });
     } catch (err) {
       logger.error(`Weekly report generation failed for ${repo.fullName}: ${err.message}`);

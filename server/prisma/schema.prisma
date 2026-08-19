@@ -118,6 +118,7 @@ model Notification {
   type      String
   title     String
   body      String
+  link      String?
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 

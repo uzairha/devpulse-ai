@@ -95,6 +95,7 @@ function Avatar({ user }) {
 }
 
 function NotificationBell() {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unread, setUnread] = useState(0);
@@ -135,7 +136,18 @@ function NotificationBell() {
     setUnread((c) => Math.max(0, c - 1));
   };
 
-  const typeIcon = (type) => type === 'sync_failed' ? '✕' : '✓';
+  const TYPE_ICONS = { sync_failed: '✕', weekly_report: '✦' };
+  const typeIcon = (type) => TYPE_ICONS[type] ?? '✓';
+  const TYPE_ICON_CLASS = { sync_failed: 'notif-icon--fail', weekly_report: 'notif-icon--info' };
+  const typeIconClass = (type) => TYPE_ICON_CLASS[type] ?? 'notif-icon--ok';
+
+  const handleItemClick = (n) => {
+    if (!n.read) handleMarkRead(n.id);
+    if (n.link) {
+      setOpen(false);
+      navigate(n.link);
+    }
+  };
 
   return (
     <div className="notif-wrap" ref={ref}>
@@ -159,10 +171,10 @@ function NotificationBell() {
               notifications.map((n) => (
                 <div
                   key={n.id}
-                  className={`notif-item ${n.read ? '' : 'notif-item--unread'}`}
-                  onClick={() => !n.read && handleMarkRead(n.id)}
+                  className={`notif-item ${n.read ? '' : 'notif-item--unread'} ${n.link ? 'notif-item--linked' : ''}`}
+                  onClick={() => handleItemClick(n)}
                 >
-                  <span className={`notif-icon ${n.type === 'sync_failed' ? 'notif-icon--fail' : 'notif-icon--ok'}`}>
+                  <span className={`notif-icon ${typeIconClass(n.type)}`}>
                     {typeIcon(n.type)}
                   </span>
                   <div className="notif-content">

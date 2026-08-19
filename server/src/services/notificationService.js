@@ -1,7 +1,7 @@
 import prisma from '../lib/prisma.js';
 
-export const createNotification = async (userId, { type, title, body }) => {
-  return prisma.notification.create({ data: { userId, type, title, body } });
+export const createNotification = async (userId, { type, title, body, link }) => {
+  return prisma.notification.create({ data: { userId, type, title, body, link } });
 };
 
 export const listNotifications = async (userId, { limit = 20 } = {}) => {

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import './ReportsPage.css';
 
 function ReportsPage() {
+  const [searchParams] = useSearchParams();
   const [repos, setRepos] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [report, setReport] = useState(null);
@@ -10,20 +12,28 @@ function ReportsPage() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
 
-  const loadHistory = (repoId) => {
+  const loadHistory = (repoId, { autoView, repoFullName } = {}) => {
     api
       .get(`/ai/weekly-report/${repoId}/history`)
-      .then((res) => setHistory(res.data))
+      .then((res) => {
+        setHistory(res.data);
+        if (autoView && res.data.length > 0) {
+          const [latest] = res.data;
+          setReport({ report: latest.content, generatedAt: latest.createdAt, repoFullName });
+        }
+      })
       .catch(() => setHistory([]));
   };
 
   useEffect(() => {
     api.get('/repos').then((res) => {
       setRepos(res.data);
-      if (res.data.length > 0) {
-        setSelectedId(res.data[0].id);
-        loadHistory(res.data[0].id);
-      }
+      if (res.data.length === 0) return;
+
+      const linkedId = searchParams.get('repo');
+      const initial = res.data.find((r) => r.id === linkedId) ?? res.data[0];
+      setSelectedId(initial.id);
+      loadHistory(initial.id, { autoView: initial.id === linkedId, repoFullName: initial.fullName });
     });
   }, []);
 
