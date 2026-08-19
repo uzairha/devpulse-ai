@@ -61,6 +61,12 @@ function ContributorDetailPage() {
                 trend={summary.trends?.avgTimeToMergeHours}
                 trendInvert
               />
+              <MetricCard
+                label="Avg Review Turnaround"
+                value={summary.avgReviewTurnaroundHours != null ? `${summary.avgReviewTurnaroundHours}h` : null}
+                trend={summary.trends?.avgReviewTurnaroundHours}
+                trendInvert
+              />
               <MetricCard label="Commits" value={summary.commitCount} trend={summary.trends?.commitCount} />
               <MetricCard label="Lines Changed" value={`+${summary.totalAdditions} / -${summary.totalDeletions}`} />
             </div>
