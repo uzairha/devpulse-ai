@@ -188,6 +188,26 @@ export const getContributorLeaderboard = async (repositoryId, { since, until }) 
     .slice(0, 10);
 };
 
+const STALE_PR_THRESHOLD_DAYS = 7;
+
+export const getStalePrs = async (repositoryId) => {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - STALE_PR_THRESHOLD_DAYS);
+
+  const prs = await prisma.pullRequest.findMany({
+    where: { repositoryId, state: 'open', createdAt: { lte: cutoff } },
+    select: { number: true, title: true, authorLogin: true, createdAt: true },
+    orderBy: { createdAt: 'asc' },
+    take: 8,
+  });
+
+  const now = Date.now();
+  return prs.map((p) => ({
+    ...p,
+    ageDays: Math.floor((now - new Date(p.createdAt).getTime()) / 86400000),
+  }));
+};
+
 export const getActivityHeatmap = async (repositoryId, { since, until }) => {
   const [prs, commits] = await Promise.all([
     prisma.pullRequest.findMany({

@@ -8,6 +8,7 @@ import { ActivityChart, ThroughputChart } from '../components/ActivityChart';
 import { PrSizeBreakdown } from '../components/PrSizeBreakdown';
 import { ContributorLeaderboard } from '../components/ContributorLeaderboard';
 import { ActivityHeatmap } from '../components/ActivityHeatmap';
+import { StalePrList } from '../components/StalePrList';
 import './DashboardPage.css';
 import './RepoDetailPage.css';
 
@@ -122,7 +123,7 @@ function RepoDetailPage() {
       .finally(() => setLoading(false));
   }, [id, range]);
 
-  const { prMetrics: pr, commitMetrics: cm, trends, leaderboard, activityHeatmap, repo } = analytics || {};
+  const { prMetrics: pr, commitMetrics: cm, trends, leaderboard, activityHeatmap, stalePrs, repo } = analytics || {};
 
   return (
     <div className="dashboard">
@@ -212,6 +213,13 @@ function RepoDetailPage() {
                   <h3 className="chart-title">PR Size Breakdown</h3>
                   <PrSizeBreakdown data={pr.sizeBreakdown} />
                 </div>
+
+                {stalePrs?.length > 0 && (
+                  <div className="chart-section">
+                    <h3 className="chart-title">Stale Open PRs (7+ days)</h3>
+                    <StalePrList data={stalePrs} repoFullName={repo?.fullName} />
+                  </div>
+                )}
               </section>
 
               <section className="dash-section">

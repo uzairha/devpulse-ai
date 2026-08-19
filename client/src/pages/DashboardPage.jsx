@@ -8,6 +8,7 @@ import { DateRangePicker, DEFAULT_RANGE, buildRangeQuery } from '../components/D
 import { ActivityChart, ThroughputChart } from '../components/ActivityChart';
 import { ContributorLeaderboard } from '../components/ContributorLeaderboard';
 import { ActivityHeatmap } from '../components/ActivityHeatmap';
+import { StalePrList } from '../components/StalePrList';
 import './DashboardPage.css';
 
 function DashboardPage() {
@@ -37,7 +38,7 @@ function DashboardPage() {
       .finally(() => setLoading(false));
   }, [selectedId, range]);
 
-  const { prMetrics: pr, commitMetrics: cm, trends, leaderboard, activityHeatmap } = analytics || {};
+  const { prMetrics: pr, commitMetrics: cm, trends, leaderboard, activityHeatmap, stalePrs, repo } = analytics || {};
 
   return (
     <div className="dashboard">
@@ -105,6 +106,13 @@ function DashboardPage() {
               <h3 className="chart-title">Weekly Merged PRs</h3>
               <ThroughputChart data={pr.weeklyThroughput} />
             </div>
+
+            {stalePrs?.length > 0 && (
+              <div className="chart-section">
+                <h3 className="chart-title">Stale Open PRs (7+ days)</h3>
+                <StalePrList data={stalePrs} repoFullName={repo?.fullName} />
+              </div>
+            )}
           </section>
 
           <section className="dash-section">

@@ -486,3 +486,71 @@
 .leaderboard-lines {
   width: 120px;
 }
+
+/* Stale PR list */
+.stale-prs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.stale-pr-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.625rem;
+  margin: 0 -0.625rem;
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+  font-size: 0.875rem;
+  transition: background 0.15s;
+}
+
+.stale-pr-row:hover {
+  background: var(--bg-hover);
+}
+
+.stale-pr-row:hover .stale-pr-title {
+  color: var(--accent);
+}
+
+.stale-pr-number {
+  flex-shrink: 0;
+  width: 40px;
+  color: var(--text-faint);
+  font-size: 0.8rem;
+}
+
+.stale-pr-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.stale-pr-author {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  width: 100px;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stale-pr-age {
+  flex-shrink: 0;
+  color: var(--warning-text, var(--warning));
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: 5px;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}

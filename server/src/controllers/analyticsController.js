@@ -6,6 +6,7 @@ import {
   getContributorLeaderboard,
   getPeriodComparison,
   getActivityHeatmap,
+  getStalePrs,
 } from '../services/analyticsService.js';
 import { calculateHealthScore } from '../services/aiService.js';
 import { getCached, setCached } from '../lib/cache.js';
@@ -56,12 +57,13 @@ export const getRepoAnalytics = async (req, res, next) => {
     const cached = await getCached(cacheKey);
     if (cached) return res.json(cached);
 
-    const [prMetrics, commitMetrics, trends, leaderboard, activityHeatmap] = await Promise.all([
+    const [prMetrics, commitMetrics, trends, leaderboard, activityHeatmap, stalePrs] = await Promise.all([
       getPrMetrics(repo.id, range),
       getCommitMetrics(repo.id, range),
       getPeriodComparison(repo.id, range),
       getContributorLeaderboard(repo.id, range),
       getActivityHeatmap(repo.id, range),
+      getStalePrs(repo.id),
     ]);
 
     const payload = {
@@ -73,6 +75,7 @@ export const getRepoAnalytics = async (req, res, next) => {
       trends,
       leaderboard,
       activityHeatmap,
+      stalePrs,
     };
     await setCached(cacheKey, payload);
     res.json(payload);
