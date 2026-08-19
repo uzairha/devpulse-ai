@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { body, param } from 'express-validator';
 import requireAuth from '../middleware/requireAuth.js';
 import validate from '../middleware/validate.js';
-import { summarizePr, getHealthScore, weeklyReport, chat } from '../controllers/aiController.js';
+import { summarizePr, getHealthScore, weeklyReport, weeklyReportHistory, chat } from '../controllers/aiController.js';
 
 const router = Router();
 
@@ -27,6 +27,13 @@ router.post(
   [param('id').isUUID().withMessage('Invalid repository id')],
   validate,
   weeklyReport,
+);
+
+router.get(
+  '/weekly-report/:id/history',
+  [param('id').isUUID().withMessage('Invalid repository id')],
+  validate,
+  weeklyReportHistory,
 );
 
 router.post(

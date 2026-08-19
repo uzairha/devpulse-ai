@@ -92,8 +92,8 @@ function SettingsPage() {
         <div className="settings-card">
           <div className="settings-row">
             <div>
-              <div className="settings-row-label">Weekly report emails</div>
-              <div className="settings-row-hint">Receive a weekly summary of your team's activity</div>
+              <div className="settings-row-label">Weekly reports</div>
+              <div className="settings-row-hint">Auto-generate an AI weekly digest every Monday and notify me when it&apos;s ready</div>
             </div>
             <label className="toggle">
               <input

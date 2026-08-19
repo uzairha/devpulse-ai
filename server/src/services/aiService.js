@@ -83,6 +83,25 @@ Write the weekly engineering digest.`;
   return chat(systemPrompt, userPrompt, { maxTokens: 600 });
 };
 
+export const generateAndSaveWeeklyReport = async (repositoryId) => {
+  const periodEnd = new Date();
+  const periodStart = new Date(periodEnd);
+  periodStart.setDate(periodStart.getDate() - 7);
+
+  const content = await generateWeeklyReport(repositoryId);
+
+  return prisma.weeklyReport.create({
+    data: { repositoryId, content, periodStart, periodEnd },
+  });
+};
+
+export const listWeeklyReports = async (repositoryId, limit = 10) =>
+  prisma.weeklyReport.findMany({
+    where: { repositoryId },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  });
+
 export const chatWithRepoData = async (repositoryId, question, history = []) => {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);

@@ -13,6 +13,8 @@ import notificationsRouter from './routes/notifications.js';
 import webhooksRouter from './routes/webhooks.js';
 import errorHandler from './middleware/errorHandler.js';
 import { startSyncWorker } from './workers/syncWorker.js';
+import { startReportWorker, scheduleWeeklyReports } from './workers/reportWorker.js';
+import logger from './lib/logger.js';
 
 const app = express();
 
@@ -52,6 +54,8 @@ app.use('/api/webhooks', webhooksRouter);
 app.use(errorHandler);
 
 startSyncWorker();
+startReportWorker();
+scheduleWeeklyReports().catch((err) => logger.error(`Failed to schedule weekly reports: ${err.message}`));
 
 app.listen(config.port, () => {
   console.log(`Server running on port ${config.port} [${config.nodeEnv}]`);

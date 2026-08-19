@@ -6,15 +6,32 @@ function ReportsPage() {
   const [repos, setRepos] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [report, setReport] = useState(null);
+  const [history, setHistory] = useState([]);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+
+  const loadHistory = (repoId) => {
+    api
+      .get(`/ai/weekly-report/${repoId}/history`)
+      .then((res) => setHistory(res.data))
+      .catch(() => setHistory([]));
+  };
 
   useEffect(() => {
     api.get('/repos').then((res) => {
       setRepos(res.data);
-      if (res.data.length > 0) setSelectedId(res.data[0].id);
+      if (res.data.length > 0) {
+        setSelectedId(res.data[0].id);
+        loadHistory(res.data[0].id);
+      }
     });
   }, []);
+
+  const selectRepo = (repoId) => {
+    setSelectedId(repoId);
+    setReport(null);
+    loadHistory(repoId);
+  };
 
   const handleGenerate = async () => {
     if (!selectedId) return;
@@ -24,6 +41,7 @@ function ReportsPage() {
     try {
       const res = await api.post(`/ai/weekly-report/${selectedId}`);
       setReport(res.data);
+      loadHistory(selectedId);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -31,12 +49,25 @@ function ReportsPage() {
     }
   };
 
+  const repoFullName = repos.find((r) => r.id === selectedId)?.fullName ?? '';
+
+  const viewPastReport = (past) => {
+    setReport({
+      report: past.content,
+      generatedAt: past.createdAt,
+      repoFullName,
+    });
+  };
+
   return (
     <div className="reports-page">
       <div className="reports-header">
         <div>
           <h1 className="reports-title">Reports</h1>
-          <p className="reports-subtitle">AI-generated weekly engineering digests.</p>
+          <p className="reports-subtitle">
+            AI-generated weekly engineering digests. Auto-generated every Monday for repos with weekly
+            reports enabled in <a href="/settings">Settings</a> — you&apos;ll get a notification when a new one is ready.
+          </p>
         </div>
       </div>
 
@@ -50,7 +81,7 @@ function ReportsPage() {
             <select
               className="reports-select"
               value={selectedId}
-              onChange={(e) => { setSelectedId(e.target.value); setReport(null); }}
+              onChange={(e) => selectRepo(e.target.value)}
             >
               {repos.map((r) => (
                 <option key={r.id} value={r.id}>{r.fullName}</option>
@@ -94,6 +125,24 @@ function ReportsPage() {
             <div className="reports-placeholder">
               <div className="placeholder-icon">◈</div>
               <p>Select a repository and click <strong>Generate weekly report</strong> to get an AI digest of the last 7 days of activity.</p>
+            </div>
+          )}
+
+          {history.length > 0 && (
+            <div className="reports-history">
+              <h2 className="reports-history-title">Past reports</h2>
+              <div className="reports-history-list">
+                {history.map((past) => (
+                  <button
+                    key={past.id}
+                    className="reports-history-item"
+                    onClick={() => viewPastReport(past)}
+                  >
+                    <span>{new Date(past.periodStart).toLocaleDateString()} – {new Date(past.periodEnd).toLocaleDateString()}</span>
+                    <span className="reports-history-date">{new Date(past.createdAt).toLocaleString()}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </>
