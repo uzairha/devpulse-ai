@@ -7,6 +7,7 @@ import { MetricCard } from '../components/MetricCard';
 import { DateRangePicker, DEFAULT_RANGE, buildRangeQuery } from '../components/DateRangePicker';
 import { ActivityChart, ThroughputChart } from '../components/ActivityChart';
 import { ContributorLeaderboard } from '../components/ContributorLeaderboard';
+import { ActivityHeatmap } from '../components/ActivityHeatmap';
 import './DashboardPage.css';
 
 function DashboardPage() {
@@ -36,7 +37,7 @@ function DashboardPage() {
       .finally(() => setLoading(false));
   }, [selectedId, range]);
 
-  const { prMetrics: pr, commitMetrics: cm, trends, leaderboard } = analytics || {};
+  const { prMetrics: pr, commitMetrics: cm, trends, leaderboard, activityHeatmap } = analytics || {};
 
   return (
     <div className="dashboard">
@@ -122,6 +123,16 @@ function DashboardPage() {
               <ActivityChart data={cm.dailyActivity} />
             </div>
           </section>
+
+          {activityHeatmap?.some((c) => c.count > 0) && (
+            <section className="dash-section">
+              <h2 className="dash-section-title">Activity Heatmap</h2>
+              <div className="chart-section">
+                <h3 className="chart-title">When the team is most active (PRs + commits, UTC)</h3>
+                <ActivityHeatmap data={activityHeatmap} />
+              </div>
+            </section>
+          )}
 
           {leaderboard?.length > 0 && (
             <section className="dash-section">

@@ -381,6 +381,55 @@
   color: var(--text-muted);
 }
 
+/* Activity heatmap */
+.heatmap-wrap {
+  overflow-x: auto;
+}
+
+.heatmap-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 480px;
+}
+
+.heatmap-row,
+.heatmap-hour-axis {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.heatmap-day-label {
+  width: 32px;
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: var(--text-faint);
+}
+
+.heatmap-cells {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 3px;
+}
+
+.heatmap-cell {
+  aspect-ratio: 1;
+  border-radius: 2px;
+  background: var(--bg-hover);
+}
+
+.heatmap-hour-axis {
+  margin-top: 2px;
+}
+
+.heatmap-hour-label {
+  font-size: 0.65rem;
+  color: var(--text-faint);
+  text-align: left;
+}
+
 /* Contributor leaderboard */
 .leaderboard {
   display: flex;

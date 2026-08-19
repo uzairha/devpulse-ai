@@ -188,6 +188,21 @@ export const getContributorLeaderboard = async (repositoryId, { since, until }) 
     .slice(0, 10);
 };
 
+export const getActivityHeatmap = async (repositoryId, { since, until }) => {
+  const [prs, commits] = await Promise.all([
+    prisma.pullRequest.findMany({
+      where: { repositoryId, createdAt: { gte: since, lte: until } },
+      select: { createdAt: true },
+    }),
+    prisma.commit.findMany({
+      where: { repositoryId, committedAt: { gte: since, lte: until } },
+      select: { committedAt: true },
+    }),
+  ]);
+
+  return buildHeatmapCells([...prs.map((p) => p.createdAt), ...commits.map((c) => c.committedAt)]);
+};
+
 export const getPeriodComparison = async (repositoryId, { since, until }, authorLogin = null) => {
   const periodStart = since;
   const previousStart = new Date(since.getTime() - (until.getTime() - since.getTime()));
@@ -299,6 +314,22 @@ const buildDailyBuckets = (dates, since, until) => {
     if (key in buckets) buckets[key]++;
   }
   return Object.entries(buckets).map(([date, count]) => ({ date, count }));
+};
+
+// day: 0 (Sun) - 6 (Sat), hour: 0-23, both UTC to match the ISO-date bucketing used elsewhere
+const buildHeatmapCells = (dates) => {
+  const counts = Array.from({ length: 7 }, () => Array(24).fill(0));
+  for (const date of dates) {
+    const d = new Date(date);
+    counts[d.getUTCDay()][d.getUTCHours()]++;
+  }
+  const cells = [];
+  for (let day = 0; day < 7; day++) {
+    for (let hour = 0; hour < 24; hour++) {
+      cells.push({ day, hour, count: counts[day][hour] });
+    }
+  }
+  return cells;
 };
 
 const buildWeeklyBuckets = (dates, since, until) => {
