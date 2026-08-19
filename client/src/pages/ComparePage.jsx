@@ -56,8 +56,10 @@ function ComparePage() {
                 <th>PRs</th>
                 <th>Merge Rate</th>
                 <th>Avg Merge Time</th>
+                <th>Avg Review Turnaround</th>
                 <th>Commits</th>
                 <th>Contributors</th>
+                <th>Conventional Commits</th>
                 <th>Lines Changed</th>
               </tr>
             </thead>
@@ -77,8 +79,10 @@ function ComparePage() {
                   <td>{r.mergedCount} / {r.prCount}</td>
                   <td>{r.mergeRate}%</td>
                   <td>{r.avgTimeToMergeHours != null ? `${r.avgTimeToMergeHours}h` : '—'}</td>
+                  <td>{r.avgReviewTurnaroundHours != null ? `${r.avgReviewTurnaroundHours}h` : '—'}</td>
                   <td>{r.commitCount}</td>
                   <td>{r.contributorCount}</td>
+                  <td>{r.commitCount > 0 ? `${r.commitComplianceRate}%` : '—'}</td>
                   <td className="col-diff">
                     <span className="add">+{r.additions}</span> / <span className="del">-{r.deletions}</span>
                   </td>
