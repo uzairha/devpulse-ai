@@ -48,6 +48,12 @@ async function main() {
     for (let i = 1; i <= 10; i++) {
       const createdAt = new Date(Date.now() - i * 3 * 24 * 60 * 60 * 1000);
       const mergedAt = i % 3 !== 0 ? new Date(createdAt.getTime() + i * 4 * 60 * 60 * 1000) : null;
+      const reviewCount = Math.floor(Math.random() * 3);
+      // First review lands a few hours after PR open, always before merge if merged.
+      const firstReviewAt =
+        reviewCount > 0
+          ? new Date(createdAt.getTime() + (1 + Math.random() * 20) * 60 * 60 * 1000)
+          : null;
 
       await prisma.pullRequest.upsert({
         where: { repositoryId_githubPrId: { repositoryId: repo.id, githubPrId: i } },
@@ -64,22 +70,41 @@ async function main() {
           additions: Math.floor(Math.random() * 200) + 10,
           deletions: Math.floor(Math.random() * 50) + 5,
           changedFiles: Math.floor(Math.random() * 10) + 1,
-          reviewCount: Math.floor(Math.random() * 3),
+          reviewCount,
           commentCount: Math.floor(Math.random() * 8),
+          firstReviewAt,
         },
       });
     }
 
+    // Seed 20 commits per repo — mix of conventional-commit-compliant and plain
+    // messages so the commit-message-compliance metric has something to show.
+    const commitMessageFor = (i) => {
+      const messages = [
+        `feat: add feature ${i} to ${repo.name}`,
+        `fix: correct bug in module ${i}`,
+        `chore: bump dependency ${i}`,
+        `docs: update readme section ${i}`,
+        `refactor: simplify handler ${i}`,
+        `Updated stuff ${i}`,
+        `WIP ${i}`,
+        `fixed the thing`,
+      ];
+      return messages[i % messages.length];
+    };
+
     // Seed 20 commits per repo
     for (let i = 1; i <= 20; i++) {
       const sha = `abc${repoData.githubId}${String(i).padStart(4, '0')}def`;
+      const message = commitMessageFor(i);
+
       await prisma.commit.upsert({
         where: { sha },
         update: {},
         create: {
           repositoryId: repo.id,
           sha,
-          message: `chore: commit ${i} for ${repo.name}`,
+          message,
           authorLogin: 'testuser',
           authorEmail: 'test@devpulse.ai',
           committedAt: new Date(Date.now() - i * 1.5 * 24 * 60 * 60 * 1000),
