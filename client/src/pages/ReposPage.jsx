@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { Sparkline, timeAgo } from '../components/Sparkline';
 import './ReposPage.css';
 
 function SyncStatus({ status, lastSyncAt }) {
@@ -44,7 +45,11 @@ function ConnectedRepoCard({ repo, onDisconnect, onSync, onEnableAutoSync, disco
               {enablingAutoSync ? 'Enabling…' : 'Enable auto-sync'}
             </button>
           )}
+          <span className="repo-activity-label">{timeAgo(repo.lastActivityAt)}</span>
         </div>
+      </div>
+      <div className="repo-card-sparkline" title="PRs + commits, last 14 days">
+        <Sparkline data={repo.activitySparkline} />
       </div>
       <div className="repo-card-actions">
         <button

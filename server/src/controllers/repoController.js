@@ -1,6 +1,7 @@
 import prisma from '../lib/prisma.js';
 import { getUserRepos, createRepoWebhook, deleteRepoWebhook } from '../services/githubApiService.js';
 import { syncQueue } from '../lib/queue.js';
+import { getRepoActivitySparkline } from '../services/analyticsService.js';
 import config from '../config/index.js';
 import logger from '../lib/logger.js';
 
@@ -130,7 +131,13 @@ export const listRepos = async (req, res, next) => {
       where: { userId: req.user.id },
       orderBy: { createdAt: 'desc' },
     });
-    res.json(repos);
+    const withActivity = await Promise.all(
+      repos.map(async (repo) => {
+        const { daily, lastActivityAt } = await getRepoActivitySparkline(repo.id);
+        return { ...repo, activitySparkline: daily, lastActivityAt };
+      }),
+    );
+    res.json(withActivity);
   } catch (err) {
     next(err);
   }
