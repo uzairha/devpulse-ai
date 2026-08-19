@@ -13,6 +13,7 @@ export const getPrMetrics = async (repositoryId, { since, until }) => {
       changedFiles: true,
       reviewCount: true,
       commentCount: true,
+      firstReviewAt: true,
     },
   });
 
@@ -37,6 +38,18 @@ export const getPrMetrics = async (repositoryId, { since, until }) => {
   const avgReviewCount =
     total > 0 ? +(prs.reduce((sum, p) => sum + p.reviewCount, 0) / total).toFixed(1) : 0;
 
+  const reviewTurnaroundTimes = prs
+    .filter((p) => p.firstReviewAt)
+    .map((p) => new Date(p.firstReviewAt) - new Date(p.createdAt))
+    .filter((ms) => ms > 0);
+
+  const avgReviewTurnaroundHours =
+    reviewTurnaroundTimes.length > 0
+      ? Math.round(
+          reviewTurnaroundTimes.reduce((a, b) => a + b, 0) / reviewTurnaroundTimes.length / 3600000,
+        )
+      : null;
+
   // PR throughput: merged PRs grouped by week
   const weeklyThroughput = buildWeeklyBuckets(
     merged.map((p) => p.mergedAt),
@@ -55,6 +68,7 @@ export const getPrMetrics = async (repositoryId, { since, until }) => {
     totalAdditions,
     totalDeletions,
     avgReviewCount,
+    avgReviewTurnaroundHours,
     weeklyThroughput,
     sizeBreakdown,
   };
@@ -68,6 +82,7 @@ export const getCommitMetrics = async (repositoryId, { since, until }) => {
       committedAt: true,
       additions: true,
       deletions: true,
+      message: true,
     },
   });
 
@@ -96,12 +111,19 @@ export const getCommitMetrics = async (repositoryId, { since, until }) => {
   const totalAdditions = commits.reduce((sum, c) => sum + c.additions, 0);
   const totalDeletions = commits.reduce((sum, c) => sum + c.deletions, 0);
 
+  const commitTypes = commits.map((c) => c.message.match(CONVENTIONAL_COMMIT_RE)?.[1] ?? null);
+  const compliantCount = commitTypes.filter(Boolean).length;
+  const complianceRate = total > 0 ? Math.round((compliantCount / total) * 100) : 0;
+  const typeBreakdown = buildCommitTypeBreakdown(commitTypes);
+
   return {
     total,
     contributorCount: contributors.length,
     topContributors,
     totalAdditions,
     totalDeletions,
+    complianceRate,
+    typeBreakdown,
     dailyActivity,
   };
 };
@@ -110,7 +132,7 @@ export const getContributorSummary = async (repositoryId, login, { since, until 
   const [prs, commits] = await Promise.all([
     prisma.pullRequest.findMany({
       where: { repositoryId, authorLogin: login, createdAt: { gte: since, lte: until } },
-      select: { mergedAt: true, createdAt: true, additions: true, deletions: true },
+      select: { mergedAt: true, createdAt: true, additions: true, deletions: true, firstReviewAt: true },
     }),
     prisma.commit.findMany({
       where: { repositoryId, authorLogin: login, committedAt: { gte: since, lte: until } },
@@ -123,6 +145,11 @@ export const getContributorSummary = async (repositoryId, login, { since, until 
     .map((p) => new Date(p.mergedAt) - new Date(p.createdAt))
     .filter((ms) => ms > 0);
 
+  const reviewTurnaroundTimes = prs
+    .filter((p) => p.firstReviewAt)
+    .map((p) => new Date(p.firstReviewAt) - new Date(p.createdAt))
+    .filter((ms) => ms > 0);
+
   return {
     prCount: prs.length,
     mergedPrCount: merged.length,
@@ -130,6 +157,12 @@ export const getContributorSummary = async (repositoryId, login, { since, until 
     avgTimeToMergeHours:
       mergeTimes.length > 0
         ? Math.round(mergeTimes.reduce((a, b) => a + b, 0) / mergeTimes.length / 3600000)
+        : null,
+    avgReviewTurnaroundHours:
+      reviewTurnaroundTimes.length > 0
+        ? Math.round(
+            reviewTurnaroundTimes.reduce((a, b) => a + b, 0) / reviewTurnaroundTimes.length / 3600000,
+          )
         : null,
     commitCount: commits.length,
     totalAdditions:
@@ -188,6 +221,35 @@ export const getContributorLeaderboard = async (repositoryId, { since, until }) 
     .slice(0, 10);
 };
 
+const SPARKLINE_DAYS = 14;
+
+// Compact activity summary for repo list cards: a 14-day daily PR+commit count
+// series plus the timestamp of the single most recent PR/commit, independent of
+// any dashboard date-range selection.
+export const getRepoActivitySparkline = async (repositoryId) => {
+  const until = new Date();
+  const since = new Date(until);
+  since.setDate(since.getDate() - SPARKLINE_DAYS);
+
+  const [prs, commits] = await Promise.all([
+    prisma.pullRequest.findMany({
+      where: { repositoryId, createdAt: { gte: since, lte: until } },
+      select: { createdAt: true },
+    }),
+    prisma.commit.findMany({
+      where: { repositoryId, committedAt: { gte: since, lte: until } },
+      select: { committedAt: true },
+    }),
+  ]);
+
+  const dates = [...prs.map((p) => p.createdAt), ...commits.map((c) => c.committedAt)];
+  const daily = buildDailyBuckets(dates, since, until);
+  const lastActivityAt =
+    dates.length > 0 ? new Date(Math.max(...dates.map((d) => new Date(d).getTime()))) : null;
+
+  return { daily, lastActivityAt };
+};
+
 const STALE_PR_THRESHOLD_DAYS = 7;
 
 export const getStalePrs = async (repositoryId) => {
@@ -234,7 +296,7 @@ export const getPeriodComparison = async (repositoryId, { since, until }, author
         createdAt: { gte: previousStart, lte: until },
         ...(authorLogin ? { authorLogin } : {}),
       },
-      select: { createdAt: true, mergedAt: true },
+      select: { createdAt: true, mergedAt: true, firstReviewAt: true },
     }),
     prisma.commit.findMany({
       where: {
@@ -272,6 +334,19 @@ export const getPeriodComparison = async (repositoryId, { since, until }, author
   const currentMergedCount = currentPrs.filter((p) => p.mergedAt).length;
   const previousMergedCount = previousPrs.filter((p) => p.mergedAt).length;
 
+  const avgReviewTurnaroundHours = (list) => {
+    const times = list
+      .filter((p) => p.firstReviewAt)
+      .map((p) => new Date(p.firstReviewAt) - new Date(p.createdAt))
+      .filter((ms) => ms > 0);
+    return times.length > 0
+      ? Math.round(times.reduce((a, b) => a + b, 0) / times.length / 3600000)
+      : null;
+  };
+
+  const currentAvgReviewTurnaround = avgReviewTurnaroundHours(currentPrs);
+  const previousAvgReviewTurnaround = avgReviewTurnaroundHours(previousPrs);
+
   return {
     prCount: {
       current: currentPrs.length,
@@ -296,10 +371,33 @@ export const getPeriodComparison = async (repositoryId, { since, until }, author
       previous: previousCommits.length,
       deltaPct: pctDelta(currentCommits.length, previousCommits.length),
     },
+    avgReviewTurnaroundHours: {
+      current: currentAvgReviewTurnaround,
+      previous: previousAvgReviewTurnaround,
+      deltaPct:
+        currentAvgReviewTurnaround != null && previousAvgReviewTurnaround != null
+          ? pctDelta(currentAvgReviewTurnaround, previousAvgReviewTurnaround)
+          : null,
+    },
   };
 };
 
 // Helpers
+
+// Matches a leading Conventional Commits type, e.g. "feat(api): add X" or "fix!: Y"
+const CONVENTIONAL_COMMIT_RE =
+  /^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([^)]+\))?!?:\s/;
+
+const buildCommitTypeBreakdown = (types) => {
+  const counts = {};
+  for (const type of types) {
+    const key = type ?? 'other';
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([type, count]) => ({ type, count }));
+};
 
 const PR_SIZE_BUCKETS = [
   { label: 'XS', max: 10 },
