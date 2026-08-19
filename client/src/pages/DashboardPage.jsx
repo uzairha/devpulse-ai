@@ -9,6 +9,7 @@ import { ActivityChart, ThroughputChart } from '../components/ActivityChart';
 import { ContributorLeaderboard } from '../components/ContributorLeaderboard';
 import { ActivityHeatmap } from '../components/ActivityHeatmap';
 import { StalePrList } from '../components/StalePrList';
+import { CommitTypeBreakdown } from '../components/CommitTypeBreakdown';
 import './DashboardPage.css';
 
 function DashboardPage() {
@@ -97,6 +98,12 @@ function DashboardPage() {
               />
               <MetricCard label="Avg Reviews / PR" value={pr.avgReviewCount} />
               <MetricCard
+                label="Avg Review Turnaround"
+                value={pr.avgReviewTurnaroundHours != null ? `${pr.avgReviewTurnaroundHours}h` : null}
+                trend={trends?.avgReviewTurnaroundHours}
+                trendInvert
+              />
+              <MetricCard
                 label="Lines Changed"
                 value={`+${pr.totalAdditions} / -${pr.totalDeletions}`}
               />
@@ -120,6 +127,7 @@ function DashboardPage() {
             <div className="metrics-grid">
               <MetricCard label="Total Commits" value={cm.total} trend={trends?.commitCount} />
               <MetricCard label="Contributors" value={cm.contributorCount} />
+              <MetricCard label="Conventional Commits" value={cm.total > 0 ? `${cm.complianceRate}%` : null} />
               <MetricCard
                 label="Lines Changed"
                 value={`+${cm.totalAdditions} / -${cm.totalDeletions}`}
@@ -130,6 +138,13 @@ function DashboardPage() {
               <h3 className="chart-title">Daily Commit Activity</h3>
               <ActivityChart data={cm.dailyActivity} />
             </div>
+
+            {cm.typeBreakdown?.length > 0 && (
+              <div className="chart-section">
+                <h3 className="chart-title">Commit Message Types</h3>
+                <CommitTypeBreakdown data={cm.typeBreakdown} />
+              </div>
+            )}
           </section>
 
           {activityHeatmap?.some((c) => c.count > 0) && (

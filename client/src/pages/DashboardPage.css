@@ -381,6 +381,10 @@
   color: var(--text-muted);
 }
 
+.size-breakdown-label--wide {
+  width: 64px;
+}
+
 /* Activity heatmap */
 .heatmap-wrap {
   overflow-x: auto;
