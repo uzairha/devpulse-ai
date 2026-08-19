@@ -77,6 +77,7 @@ model PullRequest {
   changedFiles    Int        @default(0)
   reviewCount     Int        @default(0)
   commentCount    Int        @default(0)
+  firstReviewAt   DateTime?
   syncedAt        DateTime   @default(now())
 
   @@unique([repositoryId, githubPrId])

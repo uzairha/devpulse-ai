@@ -1,6 +1,6 @@
 import { Worker } from 'bullmq';
 import prisma from '../lib/prisma.js';
-import { getRepoPullRequests, getRepoCommits } from '../services/githubApiService.js';
+import { getRepoPullRequests, getRepoCommits, getPrReviews } from '../services/githubApiService.js';
 import { createNotification } from '../services/notificationService.js';
 import { invalidateRepoCache } from '../lib/cache.js';
 import config from '../config/index.js';
@@ -33,6 +33,37 @@ const processSync = async (job) => {
       getRepoCommits(token, owner, repoName),
     ]);
 
+    // Only worth re-fetching reviews for PRs we don't already have a first-review
+    // timestamp for — once set, it can't change (it's the earliest review ever).
+    const existingReviewState = await prisma.pullRequest.findMany({
+      where: { repositoryId, githubPrId: { in: prs.map((pr) => pr.id) } },
+      select: { githubPrId: true, firstReviewAt: true },
+    });
+    const knownFirstReviewAt = new Map(
+      existingReviewState.map((p) => [p.githubPrId, p.firstReviewAt]),
+    );
+
+    const firstReviewAtByPrId = new Map();
+    await Promise.all(
+      prs.map(async (pr) => {
+        if (knownFirstReviewAt.get(pr.id)) {
+          firstReviewAtByPrId.set(pr.id, knownFirstReviewAt.get(pr.id));
+          return;
+        }
+        try {
+          const reviews = await getPrReviews(token, owner, repoName, pr.number);
+          const earliest = reviews
+            .map((r) => r.submitted_at)
+            .filter(Boolean)
+            .sort()[0];
+          firstReviewAtByPrId.set(pr.id, earliest ? new Date(earliest) : null);
+        } catch (err) {
+          logger.warn(`Failed to fetch reviews for ${repo.fullName}#${pr.number}: ${err.message}`);
+          firstReviewAtByPrId.set(pr.id, null);
+        }
+      }),
+    );
+
     await prisma.$transaction([
       ...prs.map((pr) =>
         prisma.pullRequest.upsert({
@@ -53,6 +84,7 @@ const processSync = async (job) => {
             changedFiles: pr.changed_files ?? 0,
             reviewCount: pr.review_comments ?? 0,
             commentCount: pr.comments ?? 0,
+            firstReviewAt: firstReviewAtByPrId.get(pr.id) ?? null,
           },
           update: {
             title: pr.title,
@@ -64,6 +96,7 @@ const processSync = async (job) => {
             changedFiles: pr.changed_files ?? 0,
             reviewCount: pr.review_comments ?? 0,
             commentCount: pr.comments ?? 0,
+            firstReviewAt: firstReviewAtByPrId.get(pr.id) ?? null,
             syncedAt: new Date(),
           },
         }),

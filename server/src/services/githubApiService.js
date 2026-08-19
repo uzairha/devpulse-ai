@@ -38,6 +38,17 @@ export const getRepoCommits = async (accessToken, owner, repo) => {
   }
 };
 
+export const getPrReviews = async (accessToken, owner, repo, pullNumber) => {
+  const octokit = getClient(accessToken);
+  const { data } = await octokit.pulls.listReviews({
+    owner,
+    repo,
+    pull_number: pullNumber,
+    per_page: 100,
+  });
+  return data;
+};
+
 export const createRepoWebhook = async (accessToken, owner, repo, webhookUrl, secret) => {
   const octokit = getClient(accessToken);
   const { data } = await octokit.repos.createWebhook({
