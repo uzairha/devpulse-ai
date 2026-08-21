@@ -1,5 +1,137 @@
 # Development Log
 
+## Week 4, Day 23 — Task 100 — 2026-08-20
+
+### Tasks Completed
+- [x] Task 100 — Week 4 review, lint sanity check, and docs wrap-up
+
+### Approach
+Closing task for Week 4, same shape as Week 3's closing task (Task 75): a review/lint pass plus catching up the docs, no new feature surface.
+- Full `git status` (not just modified files) checked for silently-accumulating untracked files or dependency drift — none found, working tree only has this week's expected changes.
+- `npm run lint` re-run on both client and server: client shows 149 problems (148 errors + 1 warning), exactly matching the expected running total after Task 97's `Sparkline.jsx`/`ReposPage.jsx` additions (139 after Task 96 + 10 from Task 97, Task 98 added 0) — confirmed no regressions across Tasks 95–99. Server lint clean (1 pre-existing unrelated `no-console` warning, unchanged).
+- `docs/development-log.md` and `docs/roadmap.md` caught up for Tasks 91–98 (had drifted behind committed work — 2nd occurrence of this, see note below) and now this Week 4 Summary.
+
+### Known Issues carried into Week 5
+- `redis.keys('analytics:<repoId>:*')` cache invalidation pattern — fine at this app's scale, wouldn't scale to a much larger keyspace.
+- Repos connected before Task 71 don't have a webhook registered retroactively (Task 83 added retroactive registration going forward, but doesn't backfill pre-71 repos with no PR/commit activity since to trigger it).
+- Compare view's Redis cache key isn't cleared by `invalidateRepoCache`, bounded by the existing 120s TTL.
+- Webhook delivery health cannot be verified in this local dev environment — no public URL / ngrok tunnel configured for `WEBHOOK_BASE_URL`. Noted across several sessions as the reason webhook-delivery-health tracking was never picked as a task; would need real infra (or a documented mock) to build against.
+- 100-row cap on CSV/JSON export (server-side query limit, not currently configurable).
+- Client lint carries 149 pre-existing `react/prop-types`/`react-hooks/set-state-in-effect` errors — consistent, sitewide convention decision (no PropTypes anywhere in this app), not treated as blocking debt.
+- `docs/development-log.md` has now fallen behind actual committed work twice (Week 4 Day 20→21 gap, and again Day 20→22 gap this week) despite being updated at both Week 3's and this session's close — worth checking `git log` against the dev-log head at the start of every session, not just when something seems off.
+
+### Tests Added
+- None (review/docs task, no code behavior changed beyond Task 99 which shipped separately).
+
+### Week 4 Summary
+All 25 tasks complete (Tasks 76–100). Webhooks, UX polish, and advanced analytics:
+- Retroactive webhook registration for repos connected before Task 71; webhook-delivery-health tracking deferred indefinitely — can't be verified without a public callback URL in local dev
+- Custom date-range picker (backend range-based signatures, frontend draft-state date inputs) replacing preset-only day windows
+- Period-over-period trend badges (Dashboard, RepoDetail, ContributorDetail), text search on PR/commit tables, CSV export, shared `MetricCard` component extraction
+- Contributor leaderboard, cross-repo comparison view, app-wide dark mode (CSS custom-property token retrofit)
+- Day-of-week × hour-of-day activity heatmap, scheduled weekly AI report generation (BullMQ repeatable job) with a "Past reports" history view
+- Clickable/actionable notifications with deep links to their source (plus a bug fix: no-token sync failures were failing silently with no notification)
+- Stale open PR widget, PR review turnaround metric, commit message compliance tracker (Conventional Commits), repo activity sparkline on the Repositories list
+- Compare page extended to match per-repo metrics as they were added, so it never fell out of sync
+- Seed script gained a `--reset` mode (Task 99) to fix a recurring staleness issue that had bitten testing across four separate sessions
+
+### Next: Week 5 — Comprehensive Testing (Tasks 101–125)
+- Task 101: TBD — see `docs/roadmap.md` for the week's focus areas
+
+---
+
+## Week 4, Day 23 — Task 99 — 2026-08-20
+
+### Tasks Completed
+- [x] Task 99 — Reset + reseed seed mode
+
+### Approach
+`prisma/seed.js` used `upsert` with `update: {}` everywhere, so once a row existed (by githubId/sha/etc.), reseeding never touched its content or timestamps. Since every seeded PR/commit timestamp is computed relative to `Date.now()` *at first insert*, seed data has been silently going stale as real time passes — this has caused a testing wrinkle in four separate prior sessions (Tasks 91, 95, 96, 97: dashboard's default 30d range showing no data, `firstReviewAt`/commit-message content changes needing manual one-off backfill scripts). Added a `--reset` flag: `prisma.user.deleteMany({ where: { email: SEED_EMAIL } })` before seeding, relying on `onDelete: Cascade` on every downstream relation (Repository → SyncJob/PullRequest/Commit/WeeklyReport, User → Notification) to clean up everything in one call. Scoped to just the one seed email — safe, not a full DB wipe (confirmed a pre-existing unrelated `newuser@test.com` test account was untouched).
+
+### Files Modified/Created
+- `server/prisma/seed.js` — `--reset` CLI flag, `SEED_EMAIL` constant.
+- `server/package.json` — new `seed`/`seed:reset` npm scripts (`prisma db seed` / `prisma db seed -- --reset`).
+
+### Tests Added
+- None. Verified directly: `npm run seed:reset` produced fresh timestamps (newest PR/commit within a day of "now"), a follow-up plain `npm run seed` stayed idempotent (no duplicate rows), lint clean. Confirmed in-browser (claude-in-chrome): Dashboard's default 30d range now shows data immediately (previously needed 90d), Repositories page sparklines show real shape and "Active yesterday" without the temporary-row workaround used in Task 97.
+
+### Known Issues / Notes
+- Same carryover as before (`redis.keys()` cache invalidation, 100-row export cap, retroactive webhook registration, webhook delivery untestable without a public URL).
+
+### Next: Week 4, Task 100
+- Task 100 closes out Week 4 — likely a wrap-up/polish task (matches the Week 3 Day 15 pattern of a review+docs task as the last task of the week). Pick at next session start.
+
+---
+
+## Week 4, Day 22 — Tasks 95–98 — 2026-08-19
+
+### Tasks Completed
+- [x] Task 95 — PR review turnaround metric
+- [x] Task 96 — Commit message compliance tracker (Conventional Commits)
+- [x] Task 97 — Repo activity sparkline on Repositories list
+- [x] Task 98 — Surface review turnaround + commit compliance on Compare page
+
+### Approach
+Four tasks in one sitting. Task 95 adds `PullRequest.firstReviewAt` (new migration) populated via `githubApiService.getPrReviews`, synced best-effort (a per-PR review-fetch failure logs a warning and falls back to `null` rather than failing the whole sync); `analyticsService.getPrMetrics`/`getPeriodComparison`/`getContributorSummary` all gained `avgReviewTurnaroundHours` and matching trend, surfaced as a new "Avg Review Turnaround" `MetricCard` on Dashboard, RepoDetail, and ContributorDetail. Task 96 adds `getCommitMetrics.complianceRate`/`typeBreakdown` (regex-matched against the Conventional Commits spec), a new `CommitTypeBreakdown.jsx` component (reuses `PrSizeBreakdown.jsx`'s bar-list CSS with a new wider label modifier), wired into Dashboard/RepoDetail only (not ContributorDetail, matching the existing repo-level-only precedent for `sizeBreakdown`). Task 97 is a deliberate change of pace after six MetricCard/bar-list-shaped widgets in a row — a compact inline-SVG sparkline (`Sparkline.jsx`) on each Repositories-list card showing 14 days of PR+commit activity, plus a `timeAgo` freshness label. Task 98 closes the loop by threading Task 95/96's two new metrics into the Compare page table so it doesn't fall out of sync with the per-repo views.
+
+### Files Modified/Created
+- `server/prisma/schema.prisma` + migration `20260819222759_add_first_review_at` — `PullRequest.firstReviewAt DateTime?`.
+- `server/src/services/githubApiService.js` — `getPrReviews(accessToken, owner, repo, pullNumber)`.
+- `server/src/workers/syncWorker.js` — fetches reviews per synced PR, computes `firstReviewAt` as earliest `submitted_at`; skipped for already-cached merged/closed PRs to save API calls.
+- `server/src/services/analyticsService.js` — `avgReviewTurnaroundHours` (Task 95), `complianceRate`/`typeBreakdown` via new `buildCommitTypeBreakdown` helper (Task 96), `getRepoActivitySparkline` (Task 97, hardcoded 14-day window, reuses `buildDailyBuckets`).
+- `server/src/controllers/repoController.js` — `listRepos` now attaches `activitySparkline`/`lastActivityAt` per repo via `Promise.all`.
+- `server/src/controllers/analyticsController.js` — `compareRepos` gained `avgReviewTurnaroundHours`/`commitComplianceRate` per repo (Task 98).
+- `client/src/components/CommitTypeBreakdown.jsx` (new), `Sparkline.jsx` (new, also exports `timeAgo`).
+- `client/src/pages/DashboardPage.jsx`, `RepoDetailPage.jsx`, `ContributorDetailPage.jsx`, `ReposPage.jsx`, `ComparePage.jsx` — wired in the above.
+- `server/prisma/seed.js` — `commitMessageFor(i)` cycling through conventional + non-compliant templates (was previously always-identical, which would have trivially shown 100% compliance); PRs with `reviewCount > 0` get a randomized `firstReviewAt`.
+
+### Tests Added
+- None. Verified end-to-end in-browser (light + dark, 90d range — 30d has no data for this seed repo, same recurring quirk as Task 91) on all affected pages: turnaround card shows 5h/8h avg, compliance shows 70% with correct type breakdown, sparkline renders correctly once seeded with recent-offset test data (temporary rows inserted and removed via one-off script), Compare page values match per-repo pages. No console errors.
+
+### Known Issues / Notes
+- `seed.js`'s `upsert` with `update: {}` means schema/content changes to already-seeded rows require a manual one-off backfill script, not just a reseed — this has now bitten on Tasks 91, 95, 96, and 97. Worth a "reset + reseed from empty" seed mode if it keeps recurring.
+- Same carryover as before (`redis.keys()` cache invalidation, 100-row export cap, retroactive webhook registration for pre-Task-71 repos, webhook delivery untestable without a public URL).
+
+### Next: Week 4, Task 99+
+- TBD — pick at next session start.
+
+---
+
+## Week 4, Day 21 — Tasks 91–94 — 2026-08-18
+
+### Tasks Completed
+- [x] Task 91 — Repo activity heatmap (day-of-week x hour-of-day)
+- [x] Task 92 — Scheduled weekly AI report generation
+- [x] Task 93 — Clickable/actionable notifications
+- [x] Task 94 — Stale open PR widget
+
+### Approach
+Task 91 adds `getActivityHeatmap` (168-cell day×hour grid combining PR-created + commit timestamps) surfaced as a new `ActivityHeatmap.jsx` component using `color-mix()` for theme-aware intensity, no new CSS tokens needed. Task 92 completes a previously dead feature — `User.weeklyReportEmail` was already a persisted Settings toggle but nothing read it; since this stack has no email/SMTP infra, this is in-app only (auto-generate + persist + notify), so the Settings label was corrected from "Weekly report emails" to "Weekly reports" to stop overpromising. New `WeeklyReport` model, BullMQ repeatable job (`0 9 * * 1`) in a new `reportWorker.js`. Task 93 makes notifications clickable/navigable (previously they only marked read) via a new `Notification.link` column, closing the dead-end left by Task 92's new notification type. Task 94 adds a stale-open-PR widget (7+ days open, oldest-first) — chosen over webhook-delivery-health tracking, which can't be verified in this local dev environment (no public URL for GitHub to call back to).
+
+### Files Modified/Created
+- `server/prisma/schema.prisma` + migrations `20260818232904_add_weekly_report`, `20260818234157_add_notification_link`.
+- `server/src/services/analyticsService.js` — `getActivityHeatmap`/`buildHeatmapCells` (Task 91), `getStalePrs` (Task 94, independent of the date-range picker, hardcoded 7-day threshold, top 8 oldest).
+- `server/src/services/aiService.js` — `generateAndSaveWeeklyReport`, `listWeeklyReports`.
+- `server/src/lib/queue.js` — `reportQueue`; `server/src/workers/reportWorker.js` (new) — repeatable cron job, notifies every repo owner with `weeklyReportEmail=true`.
+- `server/src/index.js` — `startReportWorker()` + `scheduleWeeklyReports()` wired in.
+- `server/src/services/notificationService.js` — `createNotification` takes an optional `link`.
+- `server/src/workers/syncWorker.js` — sets `link` on sync notifications (`/repos/:id`); also fixed a pre-existing bug found while testing Task 93 — the missing-GitHub-token check threw before the try/catch that records `SyncJob`/creates the failure notification, so a no-token sync (e.g. this local dev environment) failed completely silently. Moved the check inside the try block.
+- `client/src/components/ActivityHeatmap.jsx` (new), `StalePrList.jsx` (new).
+- `client/src/components/Layout/Header.jsx` — `NotificationBell` now navigates via `useNavigate` on click when `link` is set, plus a distinct icon/style for the new `weekly_report` type.
+- `client/src/pages/ReportsPage.jsx` — reads `?repo=` from the URL to preselect + auto-display the most recent report; new "Past reports" history list.
+- `client/src/pages/SettingsPage.jsx` — corrected label/hint text.
+- `client/src/pages/DashboardPage.jsx`, `RepoDetailPage.jsx` — wired in heatmap + stale-PR widget.
+
+### Tests Added
+- None. Verified end-to-end in-browser (claude-in-chrome) on Dashboard/RepoDetail in both themes: heatmap shows two clear activity clusters, weekly report generates and appears in history, notification click-through navigates correctly for both `sync_complete` and `weekly_report` types (tested via one-off inserted/removed rows since this dev environment has no real GitHub token to trigger a real sync), stale PRs correctly sorted oldest-first with working GitHub links. No console errors.
+
+### Known Issues / Notes
+- Had to kill+restart the `node --watch` dev server after each `prisma migrate dev` this session — `node --watch` doesn't watch `node_modules/`, so it never picks up a regenerated Prisma client on its own. This will recur on every future schema change.
+- 30d dashboard default range showed "No data yet" for a 90d-old seed repo — switch to 90d to see data on this seed.
+- Webhook delivery health still can't be verified locally (needs a public URL / ngrok tunnel, `WEBHOOK_BASE_URL` not configured).
+
+---
+
 ## Week 4, Day 20 (cont.) — Task 90 — 2026-08-17
 
 ### Tasks Completed
