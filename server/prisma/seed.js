@@ -3,14 +3,24 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+const SEED_EMAIL = 'test@devpulse.ai';
+
 async function main() {
+  if (process.argv.includes('--reset')) {
+    // Deletes the seeded user; onDelete: Cascade on every downstream relation
+    // (Repository -> SyncJob/PullRequest/Commit/WeeklyReport, User -> Notification)
+    // takes care of the rest. Scoped to this one seed email, not a full DB wipe.
+    const { count } = await prisma.user.deleteMany({ where: { email: SEED_EMAIL } });
+    if (count > 0) console.log(`Reset: removed existing seed user and all related data`);
+  }
+
   const passwordHash = await bcrypt.hash('password123', 12);
 
   const user = await prisma.user.upsert({
-    where: { email: 'test@devpulse.ai' },
+    where: { email: SEED_EMAIL },
     update: {},
     create: {
-      email: 'test@devpulse.ai',
+      email: SEED_EMAIL,
       passwordHash,
       githubUsername: 'testuser',
     },

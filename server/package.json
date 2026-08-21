@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "seed": "prisma db seed",
+    "seed:reset": "prisma db seed -- --reset"
   },
   "dependencies": {
     "@octokit/rest": "^22.0.1",
