@@ -1,5 +1,20 @@
 # Development Log
 
+## Post-Week-4 cleanup — 2026-08-21
+
+### Approach
+Small follow-up, not a numbered task: the PR/commit table pagination limit (default 25, max 100) was hardcoded as a duplicated magic number in two places — `routes/analytics.js`'s `express-validator` rule and `analyticsController.js`'s `listPullRequests`/`listCommits` clamp — flagged as a known issue at Week 4's close. Extracted both into a shared `server/src/lib/constants.js` (`DEFAULT_TABLE_LIMIT`, `MAX_TABLE_LIMIT`) so the two can't drift apart.
+
+### Files Modified/Created
+- `server/src/lib/constants.js` (new)
+- `server/src/routes/analytics.js`, `server/src/controllers/analyticsController.js` — import and use the shared constants.
+
+### Tests Added
+- None. Verified directly against the running server: request with `limit=999` still correctly 400s (validator rejects before the controller's clamp ever runs — confirms the controller's `Math.min` was already dead code on the over-max path, behavior unchanged), request with no `limit` still defaults to 25. Lint clean.
+- Also cleaned up 8 stale zombie `node --watch src/index.js` processes accumulated across past sessions (none were holding the port) while restarting the server to test this change.
+
+---
+
 ## Week 4, Day 23 — Task 100 — 2026-08-20
 
 ### Tasks Completed

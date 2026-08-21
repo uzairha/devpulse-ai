@@ -3,6 +3,7 @@ import { param, query } from 'express-validator';
 import requireAuth from '../middleware/requireAuth.js';
 import validate from '../middleware/validate.js';
 import { getRepoAnalytics, compareRepos, listPullRequests, listCommits, getContributor } from '../controllers/analyticsController.js';
+import { MAX_TABLE_LIMIT } from '../lib/constants.js';
 
 const router = Router();
 
@@ -28,7 +29,7 @@ router.get(
 const paginationRules = (id) => [
   param(id).isUUID().withMessage('Invalid repository id'),
   query('page').optional().isInt({ min: 1 }),
-  query('limit').optional().isInt({ min: 1, max: 100 }),
+  query('limit').optional().isInt({ min: 1, max: MAX_TABLE_LIMIT }),
 ];
 
 router.get(

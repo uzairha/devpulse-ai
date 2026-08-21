@@ -10,6 +10,7 @@ import {
 } from '../services/analyticsService.js';
 import { calculateHealthScore } from '../services/aiService.js';
 import { getCached, setCached } from '../lib/cache.js';
+import { DEFAULT_TABLE_LIMIT, MAX_TABLE_LIMIT } from '../lib/constants.js';
 
 const MAX_RANGE_DAYS = 365;
 
@@ -146,7 +147,7 @@ export const listPullRequests = async (req, res, next) => {
     if (repo.userId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
 
     const page = Math.max(parseInt(req.query.page) || 1, 1);
-    const limit = Math.min(parseInt(req.query.limit) || 25, 100);
+    const limit = Math.min(parseInt(req.query.limit) || DEFAULT_TABLE_LIMIT, MAX_TABLE_LIMIT);
     const skip = (page - 1) * limit;
     const stateFilter = req.query.state;
 
@@ -187,7 +188,7 @@ export const listCommits = async (req, res, next) => {
     if (repo.userId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
 
     const page = Math.max(parseInt(req.query.page) || 1, 1);
-    const limit = Math.min(parseInt(req.query.limit) || 25, 100);
+    const limit = Math.min(parseInt(req.query.limit) || DEFAULT_TABLE_LIMIT, MAX_TABLE_LIMIT);
     const skip = (page - 1) * limit;
 
     const where = { repositoryId: repo.id };
