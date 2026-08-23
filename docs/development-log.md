@@ -1,5 +1,29 @@
 # Development Log
 
+## Week 5, Day 21 — Task 101 — 2026-08-22
+
+### Tasks Completed
+- [x] Task 101 — Testing infrastructure: Vitest for both client and server, first unit/component tests
+
+### Approach
+Opening task for Week 5 (Comprehensive Testing, Tasks 101–125). No test framework existed on either side of the stack. Chose Vitest for both client and server rather than mixing Jest/Mocha — client already runs on Vite so config is nearly free, and a single test runner across the monorepo keeps tooling consistent. Started with pure-function/presentational-component coverage that needs no test database, rather than jumping straight to Prisma-backed integration tests — that's a bigger infra decision (test DB strategy, fixtures/seeding) better suited to its own task now that the runner itself is proven out.
+- Server: `vitest` added as a devDependency, `npm test` / `npm run test:watch` scripts. Exported the previously-private pure helpers in `analyticsService.js` (`buildCommitTypeBreakdown`, `buildPrSizeBreakdown`, `buildDailyBuckets`, `buildHeatmapCells`, `buildWeeklyBuckets`, `CONVENTIONAL_COMMIT_RE`) and `resolveRange` in `analyticsController.js` so they're directly testable.
+- Client: `vitest`, `jsdom`, `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/dom` added as devDependencies. `vite.config.js` gained a `test` block (`environment: 'jsdom'`, `setupFiles: './src/test/setup.js'`); the setup file wires up `@testing-library/jest-dom`'s matchers and an `afterEach(cleanup)` (RTL's auto-cleanup needs `test.globals: true`, which this config doesn't set, so cleanup is registered explicitly instead).
+- Test files: `server/src/services/analyticsService.test.js`, `server/src/controllers/analyticsController.test.js`, `client/src/components/Sparkline.test.jsx`, `client/src/components/MetricCard.test.jsx`, `client/src/components/DateRangePicker.test.jsx`. 45 tests total (23 server, 22 client), all passing.
+
+### Bug found and fixed
+Writing a straightforward test for `buildDailyBuckets` (fill a date range with zero-count buckets, keyed by UTC ISO date) failed on this dev machine. Root cause: the function normalized its loop cursor with local-time `setHours(0,0,0,0)`/`setDate()` while keying buckets with UTC `toISOString().slice(0,10)` — on any server/dev machine not running in UTC (this one is America/Los_Angeles), that mismatch silently shifts every daily bucket by a day. Affects `getCommitMetrics`'s `dailyActivity` and `getRepoActivitySparkline`. Fixed by switching the cursor math to `setUTCHours`/`setUTCDate`, matching the UTC approach `buildHeatmapCells` already used. This is exactly the kind of regression Week 5 testing is meant to catch — first concrete payoff from Task 101.
+
+### Tests Added
+45 new tests (see above). Lint: client stayed at 149 problems (148 errors + 1 warning, matching the Task 100 baseline exactly — new test files add zero new errors). Server lint unchanged (1 pre-existing `no-console` warning).
+
+### Not done (left for a later Week 5 task)
+- No Prisma-backed integration tests yet (would need a test-database strategy — separate schema/DB, per-test transactions or truncation, fixture data).
+- No React component tests that exercise data fetching/effects (`DateRangePicker`'s interactive draft-state behavior, `PrTable`/`CommitTable`, page-level components) — today's client tests deliberately stuck to pure functions and stateless presentational components.
+- No CI wiring — `npm test` runs locally only; CI is Week 6's territory (Tasks 126–150).
+
+---
+
 ## Post-Week-4 cleanup — 2026-08-21
 
 ### Approach

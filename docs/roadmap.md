@@ -21,5 +21,5 @@ _See `docs/development-log.md` for the task-by-task log._
 - [x] Week 2 (Tasks 26–50) — GitHub sync, analytics API, dashboard
 - [x] Week 3 (Tasks 51–75) — AI features, background jobs, security, webhooks, contributor view, Redis caching
 - [x] Week 4 (Tasks 76–100) — Webhooks, UX polish, advanced analytics — complete (period trend deltas, search, MetricCard extraction, CSV export, custom date-range picker, retroactive webhooks, weekly PR throughput + ActivityChart, disconnect confirmation, repo quick-switcher, PR size breakdown, contributor leaderboard, cross-repo comparison view, dark mode toggle, activity heatmap, scheduled weekly reports, clickable notifications, stale PR widget, review turnaround metric, commit compliance tracker, repo activity sparkline, compare page metrics sync, seed reset mode)
-- [ ] Week 5 (Tasks 101–125) — Comprehensive testing — up next
+- [ ] Week 5 (Tasks 101–125) — Comprehensive testing — in progress (Task 101: Vitest set up on client + server, first unit/component tests, 45 passing)
 - [ ] Week 6 (Tasks 126–150) — CI/CD, Docker, deployment, launch
