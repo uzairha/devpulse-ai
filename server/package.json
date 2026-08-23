@@ -6,6 +6,8 @@
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
     "lint": "eslint src/",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "seed": "prisma db seed",
     "seed:reset": "prisma db seed -- --reset"
   },
@@ -34,6 +36,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^9.39.5",
-    "prettier": "^3.9.6"
+    "prettier": "^3.9.6",
+    "vitest": "^4.1.11"
   }
 }
