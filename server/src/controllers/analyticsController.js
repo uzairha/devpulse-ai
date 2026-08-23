@@ -16,7 +16,7 @@ const MAX_RANGE_DAYS = 365;
 
 // Resolves either ?days=N (preset, relative to now) or ?startDate=&endDate= (custom range)
 // into a concrete { since, until } window, clamped to now and to MAX_RANGE_DAYS.
-const resolveRange = (query) => {
+export const resolveRange = (query) => {
   const now = new Date();
 
   if (query.startDate && query.endDate) {
