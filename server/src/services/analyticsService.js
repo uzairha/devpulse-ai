@@ -385,10 +385,10 @@ export const getPeriodComparison = async (repositoryId, { since, until }, author
 // Helpers
 
 // Matches a leading Conventional Commits type, e.g. "feat(api): add X" or "fix!: Y"
-const CONVENTIONAL_COMMIT_RE =
+export const CONVENTIONAL_COMMIT_RE =
   /^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([^)]+\))?!?:\s/;
 
-const buildCommitTypeBreakdown = (types) => {
+export const buildCommitTypeBreakdown = (types) => {
   const counts = {};
   for (const type of types) {
     const key = type ?? 'other';
@@ -407,7 +407,7 @@ const PR_SIZE_BUCKETS = [
   { label: 'XL', max: Infinity },
 ];
 
-const buildPrSizeBreakdown = (prs) => {
+export const buildPrSizeBreakdown = (prs) => {
   const counts = Object.fromEntries(PR_SIZE_BUCKETS.map((b) => [b.label, 0]));
   for (const pr of prs) {
     const changed = pr.additions + pr.deletions;
@@ -417,15 +417,15 @@ const buildPrSizeBreakdown = (prs) => {
   return PR_SIZE_BUCKETS.map((b) => ({ label: b.label, count: counts[b.label] }));
 };
 
-const buildDailyBuckets = (dates, since, until) => {
+export const buildDailyBuckets = (dates, since, until) => {
   const buckets = {};
   const cursor = new Date(since);
-  cursor.setHours(0, 0, 0, 0);
+  cursor.setUTCHours(0, 0, 0, 0);
   const end = new Date(until);
-  end.setHours(0, 0, 0, 0);
+  end.setUTCHours(0, 0, 0, 0);
   while (cursor <= end) {
     buckets[cursor.toISOString().slice(0, 10)] = 0;
-    cursor.setDate(cursor.getDate() + 1);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   for (const date of dates) {
     const key = new Date(date).toISOString().slice(0, 10);
@@ -435,7 +435,7 @@ const buildDailyBuckets = (dates, since, until) => {
 };
 
 // day: 0 (Sun) - 6 (Sat), hour: 0-23, both UTC to match the ISO-date bucketing used elsewhere
-const buildHeatmapCells = (dates) => {
+export const buildHeatmapCells = (dates) => {
   const counts = Array.from({ length: 7 }, () => Array(24).fill(0));
   for (const date of dates) {
     const d = new Date(date);
@@ -450,7 +450,7 @@ const buildHeatmapCells = (dates) => {
   return cells;
 };
 
-const buildWeeklyBuckets = (dates, since, until) => {
+export const buildWeeklyBuckets = (dates, since, until) => {
   const buckets = [];
   const cursor = new Date(since);
   while (cursor < until) {
