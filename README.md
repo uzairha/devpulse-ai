@@ -17,4 +17,24 @@
 
 ---
 
+## Running tests
+
+```bash
+docker compose up -d                 # Postgres + Redis must be running
+
+cd server
+cp .env.test.example .env.test
+docker compose exec db psql -U postgres -c "CREATE DATABASE devpulse_test;"
+npm run test:db:migrate              # apply migrations to devpulse_test
+npm test
+
+cd ../client && npm test
+```
+
+The server suite truncates its database between tests, so it refuses to start
+unless `DATABASE_URL` names a database ending in `_test` and `REDIS_URL` points at
+a non-zero Redis logical database.
+
+---
+
 _Full README coming in Week 6._

@@ -1,5 +1,72 @@
 # Development Log
 
+## Week 5, Day 24 — Tasks 102–103 — 2026-08-24
+
+### Tasks Completed
+- [x] Task 102 — Integration test infrastructure (test database + factories) and the first route-level suite
+- [x] Task 103 — Integration tests for the repository routes, incl. the outbound-HTTP mocking decision
+
+### Test database strategy (the decision this task existed to make)
+Task 101 deliberately left this open. Three options were weighed:
+- **Per-test transaction + rollback** — rejected. Every service imports the `prisma` singleton from `lib/prisma.js`, so isolating a test inside a transaction would mean threading a transactional client through every service and controller. It also cannot work through supertest at all: the request handler runs in its own async context, with no access to a transaction the test opened. Large refactor, no payoff outside tests.
+- **Testcontainers** — rejected for now. Cleanest isolation, but a heavyweight dependency with per-run container startup cost, and Docker-in-CI is a Week 6 concern. Worth revisiting when CI is actually built (Tasks 126–150).
+- **Separate `devpulse_test` database + truncate between tests** — chosen. Reuses the Postgres container already in `docker-compose.yml`, schema applied with `prisma migrate deploy`, and truncation costs milliseconds per test where `prisma migrate reset` costs seconds.
+
+Two sub-decisions came with it:
+- **Explicit factories, not `prisma/seed.js`.** The seed script randomizes `firstReviewAt` and cycles commit messages on purpose, to make the demo look realistic — exactly the wrong property for assertions. `src/test/factories.js` builds minimal, fixed rows instead: a test that cares about a value passes it in, anything it doesn't name gets a deterministic default.
+- **Real Redis on logical database 1**, not a mocked cache module. Redis is already running, so the real cache path gets exercised; `REDIS_URL` ends in `/1` so test keys never touch the dev keyspace on db 0.
+
+### Approach
+- **`src/app.js` extracted from `src/index.js`.** This was the blocker: the old `index.js` built the Express app, started both BullMQ workers, scheduled the weekly-report cron, and called `app.listen()` all at module scope, so nothing could import the app without booting the entire system. `app.js` now exports the configured app and nothing else; `index.js` is a thin entrypoint that imports it, starts the workers, and listens.
+- **Rate limiters skipped under `NODE_ENV=test`.** The auth limiter allows 20 requests per 15 minutes — a single suite blows through that and starts getting spurious 429s. Both limiters now take `skip: () => config.nodeEnv === 'test'`. `morgan` request logging is also disabled in test to keep output readable.
+- **`vitest.config.js` (new).** Reads `.env.test` and passes it through `test.env` rather than loading it in the config process, so values land in the test workers before `config/index.js` reads `process.env` (dotenv does not overwrite already-set variables, so the dev `.env` can only fill in keys `.env.test` omits). `fileParallelism: false` — the suites share one database and truncate between tests, so concurrent files would delete each other's rows mid-test.
+- **`src/test/setup.js` (new).** Truncates every table between tests (table list read from `pg_tables` at runtime, so new Prisma models are picked up automatically rather than needing a hand-maintained list) and flushes the Redis test database. Closes Prisma, both BullMQ queues and Redis in `afterAll` — importing `app.js` pulls all of them in transitively, and each holds an open connection that would otherwise keep Vitest alive after the run.
+- **Safety guards.** Because this file truncates tables, it refuses to run unless `DATABASE_URL`'s database name ends in `_test` and `REDIS_URL` names a non-zero logical database. Both guards run at module scope, before anything touches Postgres or Redis.
+- `.env.test` is gitignored (matching the existing `.env` convention); `.env.test.example` is committed with setup instructions.
+
+### Tests Added
+23 integration tests in `src/routes/auth.test.js`, covering register (duplicate email, validation, password actually stored hashed, token carries the right user id, hash never serialized in a response), login (wrong password, unknown email, and the OAuth-user-with-no-`passwordHash` case), `GET /me` (missing/malformed/forged/expired token, and valid-token-but-deleted-user), and `PATCH /settings` (partial updates, non-boolean values ignored, and confirmation that the request body can't write fields other than the two toggles). Server total is now 46 tests, all passing.
+
+### Verification
+- Full suite green, process exits cleanly (no hanging Redis/BullMQ handles).
+- Dev database confirmed untouched after a test run (2 users / 2 repos / 20 PRs / 40 commits, unchanged); test database confirmed empty.
+- **Both safety guards were tested rather than assumed** — an untested guard protecting the dev database is worthless. Pointed `DATABASE_URL` at a throwaway `devpulse_scratch` database holding canary rows: the run refused to start and the canary rows survived. Pointed `REDIS_URL` at db 0 with a canary key: the run refused and the key survived. Scratch database and canary key cleaned up afterwards.
+- App boot verified after the entrypoint refactor: `node --watch` restarted cleanly, `/api/health` 200, and a real login → JWT → `GET /api/repos` round trip returned seeded data.
+- Lint: server shows exactly the 1 pre-existing `no-console` warning (now at `index.js:12` after the refactor), no new problems. Client untouched this task.
+
+### Not done (carried into Task 103 and later)
+- Only the auth routes have integration coverage. Repos, analytics, notifications, AI and webhook routes are still untested at the route level.
+- Nothing yet covers the BullMQ workers (`syncWorker`, `reportWorker`) or the GitHub/OpenAI service layer — those need outbound HTTP mocking, which is its own decision.
+- Test database creation is still a documented manual step (`CREATE DATABASE devpulse_test` + `npm run test:db:migrate`) rather than an automated global setup.
+
+---
+
+## Task 103 — Repository route integration tests — 2026-08-24
+
+### What to mock (the decision this task forced)
+The repo routes are the first ones with outbound dependencies, so this settled the policy for the rest of Week 5:
+- **`githubApiService` is mocked** (`vi.mock`). Real outbound HTTP must never fire from a test — it would be slow, need a real token, and depend on GitHub being up. This is the only thing stubbed.
+- **BullMQ is left real.** Jobs are enqueued against the test Redis database (logical db 1) and flushed between tests by `setup.js`, so nothing accumulates and no worker is running to consume them. Enqueue assertions go through `syncQueue.getJobCounts()` against actual Redis, which covers the real enqueue path instead of asserting that a stub was called.
+- `GITHUB_WEBHOOK_SECRET` and `WEBHOOK_BASE_URL` are pinned in `.env.test`, so the webhook-registration branches behave identically whether or not a developer's dev `.env` defines them.
+
+### Tests Added
+27 integration tests in `src/routes/repos.test.js` across all seven repo routes. The emphasis is **cross-user isolation** — every route that takes an `:id` has a `repo.userId !== req.user.id → 403` check, and a regression there would leak one customer's repository data to another, so each is covered explicitly (sync, sync-status, delete, and enable-auto-sync all assert both the 403 *and* that no side effect occurred). Also covered: the webhook-registration-fails-but-connection-succeeds path, the sync-already-running 409, cascade deletion of dependent rows, and validation rejections landing before any GitHub call is made. Server total is now 73 tests, all passing (suite run three times to confirm no order-dependence or flakiness).
+
+### Finding — sparkline emits 15 points for a "14-day" window
+A test asserting `activitySparkline` had 14 entries failed with 15. `SPARKLINE_DAYS` is 14 and `getRepoActivitySparkline` sets `since = now - 14 days`, but `buildDailyBuckets` is inclusive at both ends (`while (cursor <= end)`), so the series actually spans day −14 through today: 15 points.
+
+Checked specifically whether the length is *unstable*, since `getRepoActivitySparkline` computes `since` with local-time `setDate()` while `buildDailyBuckets` normalizes with `setUTCHours()` — the same local-vs-UTC mixing behind the Task 101 bug. It is not: the inclusive range yields 15 regardless of the time of day the request lands. So this is a naming/output mismatch, not a defect, and changing it would alter the rendered chart. Pinned the real behaviour in the test with a comment rather than "fixing" a cosmetic discrepancy from inside a testing task. Worth tidying deliberately later if the 14-day label is meant literally.
+
+### Verification
+Full suite green and stable across three consecutive runs; process exits cleanly. Dev database re-checked after all runs and still intact (2 users / 2 repos / 20 PRs / 40 commits). Server lint unchanged (1 pre-existing `no-console` warning).
+
+### Not done (left for later Week 5 tasks)
+- Analytics, notifications, AI and webhook routes still have no route-level coverage.
+- The BullMQ workers themselves (`syncWorker`, `reportWorker`) are still untested — enqueueing is covered, consuming is not.
+- Test database creation remains a manual step rather than automated global setup.
+
+---
+
 ## Week 5, Day 21 — Task 101 — 2026-08-22
 
 ### Tasks Completed
