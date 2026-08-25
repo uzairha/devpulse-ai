@@ -1,13 +1,12 @@
 import app from './app.js';
 import config from './config/index.js';
-import { startSyncWorker } from './workers/syncWorker.js';
-import { startReportWorker, scheduleWeeklyReports } from './workers/reportWorker.js';
+import { startWorkers } from './worker.js';
 import logger from './lib/logger.js';
 
-startSyncWorker();
-startReportWorker();
-scheduleWeeklyReports().catch((err) => logger.error(`Failed to schedule weekly reports: ${err.message}`));
+// Outside production the API process also runs the workers, so `npm run dev`
+// stays a single command. In production the worker is a separate ECS service.
+if (config.runWorkersInApi) startWorkers();
 
 app.listen(config.port, () => {
-  console.log(`Server running on port ${config.port} [${config.nodeEnv}]`);
+  logger.info(`Server running on port ${config.port} [${config.nodeEnv}]`);
 });
