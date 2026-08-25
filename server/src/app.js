@@ -4,6 +4,7 @@ import morgan from 'morgan';
 import helmet from 'helmet';
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import config from './config/index.js';
+import logger from './lib/logger.js';
 import healthRouter from './routes/health.js';
 import authRouter from './routes/auth.js';
 import reposRouter from './routes/repos.js';
@@ -15,6 +16,11 @@ import errorHandler from './middleware/errorHandler.js';
 
 const app = express();
 
+// Behind the ALB the real client IP only exists in X-Forwarded-For. Without
+// this, express-rate-limit keys every request on the load balancer's address
+// and throttles all users as if they were one.
+if (config.trustProxyHops > 0) app.set('trust proxy', config.trustProxyHops);
+
 // Integration tests drive many requests through the same routes in one run, which
 // would otherwise trip the auth/AI limiters and produce spurious 429s.
 const skipRateLimits = config.nodeEnv === 'test';
@@ -25,7 +31,15 @@ app.use(cors({ origin: config.clientUrl }));
 // parsed before the global JSON parser consumes the stream.
 app.use('/api/webhooks/github', express.raw({ type: 'application/json' }));
 app.use(express.json());
-if (config.nodeEnv !== 'test') app.use(morgan('dev'));
+if (config.nodeEnv !== 'test') {
+  // Access logs go through winston so production emits one parseable JSON
+  // stream to CloudWatch rather than ANSI-coloured text.
+  app.use(
+    morgan(config.isProduction ? 'combined' : 'dev', {
+      stream: { write: (message) => logger.info(message.trim()) },
+    })
+  );
+}
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
