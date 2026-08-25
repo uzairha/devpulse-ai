@@ -1,0 +1,19 @@
+node_modules
+npm-debug.log*
+
+# Secrets must never enter the build context
+.env
+.env.*
+!.env.example
+!.env.test.example
+
+# Test code and artifacts are not part of the runtime image
+src/test
+**/*.test.js
+coverage
+vitest.config.js
+
+.git
+.gitignore
+Dockerfile
+.dockerignore

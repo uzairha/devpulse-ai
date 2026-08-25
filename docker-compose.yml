@@ -1,3 +1,19 @@
+# Local development environment. This is the only place DevPulse actually runs.
+#
+# Two modes:
+#
+#   docker compose up -d              Postgres + Redis only. The API and client
+#                                     run natively (`npm run dev`). This is the
+#                                     normal day-to-day loop and is unchanged.
+#
+#   docker compose --profile full up  The whole stack in containers, including
+#                                     the production images and the separate
+#                                     worker process. Use this to verify the
+#                                     images that would be pushed to ECR.
+#
+# The AWS Terraform configuration under infrastructure/ is a separate, deployment
+# -time concern; nothing here depends on AWS.
+
 services:
   db:
     image: postgres:15-alpine
@@ -28,6 +44,89 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # --- "full" profile: the containerised stack ------------------------------
+  # Every service below is skipped unless --profile full is passed.
+
+  # One-shot migration, mirroring the ECS RunTask step in the AWS deployment.
+  migrate:
+    profiles: ['full']
+    build:
+      context: ./server
+    command: ['npx', 'prisma', 'migrate', 'deploy']
+    environment:
+      DATABASE_URL: postgresql://postgres:password@db:5432/devpulse
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: 'no'
+
+  server:
+    profiles: ['full']
+    build:
+      context: ./server
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://postgres:password@db:5432/devpulse
+      REDIS_URL: redis://redis:6379
+      CLIENT_URL: http://localhost:8080
+      # Local throwaway value. In AWS this comes from Secrets Manager, and the
+      # app refuses to boot in production if it is missing or left at the
+      # development default.
+      JWT_SECRET: local-compose-only-not-a-real-secret
+      # nginx sits in front, exactly as the ALB does in AWS.
+      TRUST_PROXY_HOPS: 1
+    ports:
+      # Overridable so this stack can run beside a native `npm run dev`.
+      - '${SERVER_PORT:-3001}:3001'
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # Same image as `server`, different command. In production this is its own
+  # ECS service; NODE_ENV=production keeps the API from also consuming jobs.
+  worker:
+    profiles: ['full']
+    build:
+      context: ./server
+    command: ['node', 'src/worker.js']
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:password@db:5432/devpulse
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: local-compose-only-not-a-real-secret
+    # The worker runs the API image, so it inherits that image's HTTP
+    # HEALTHCHECK - but it listens on no port. The ECS worker task definition
+    # likewise declares no container health check.
+    healthcheck:
+      disable: true
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  client:
+    profiles: ['full']
+    build:
+      context: ./client
+    ports:
+      - '${CLIENT_PORT:-8080}:8080'
+    volumes:
+      # Adds the /api proxy that the ALB provides in AWS. Local-only.
+      - ./client/nginx.local.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - server
+    restart: unless-stopped
 
 volumes:
   postgres_data:
