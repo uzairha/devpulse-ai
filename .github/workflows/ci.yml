@@ -1,0 +1,190 @@
+# Continuous integration.
+#
+# Runs on every push and pull request. Nothing here touches AWS - no
+# credentials are needed or read. This is deliberate: CI must keep working
+# for anyone who clones this repository, whether or not they ever configure
+# deploy-aws.yml.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# A new push to the same branch/PR cancels the still-running check for the
+# previous one - no point finishing a check on code that is already stale.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  server:
+  # ---------------------------------------------------------------------------
+  # Lint and the integration suite. Postgres and Redis run as service
+  # containers on the runner itself - same images docker-compose.yml uses
+  # locally (postgres:15-alpine, redis:7-alpine) - and the test database is
+  # created directly via POSTGRES_DB rather than a separate `CREATE DATABASE`
+  # step. server/.env.test.example's DATABASE_URL/REDIS_URL already point at
+  # localhost, which is exactly where GitHub Actions exposes service
+  # containers to job steps, so it is copied in unmodified.
+    name: Server (lint + test)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: devpulse_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Lint
+        working-directory: server
+        run: npm run lint
+
+      - name: Configure test environment
+        working-directory: server
+        run: cp .env.test.example .env.test
+
+      - name: Apply test database migrations
+        working-directory: server
+        run: npm run test:db:migrate
+
+      - name: Test
+        working-directory: server
+        run: npm test
+
+  # ---------------------------------------------------------------------------
+  client:
+  # ---------------------------------------------------------------------------
+    name: Client (lint + test + build)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Lint
+        working-directory: client
+        run: npm run lint
+
+      - name: Test
+        working-directory: client
+        run: npm test
+
+      - name: Production build
+        working-directory: client
+        run: npm run build
+
+  # ---------------------------------------------------------------------------
+  docker:
+  # ---------------------------------------------------------------------------
+  # Confirms both production images actually build - catches a broken
+  # Dockerfile before it reaches a deploy. Images are built and discarded, not
+  # pushed anywhere; pushing to ECR is deploy-aws.yml's job, not CI's.
+    name: Docker image builds
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build server image
+        uses: docker/build-push-action@v6
+        with:
+          context: server
+          push: false
+          tags: devpulse-server:ci
+
+      - name: Build client image
+        uses: docker/build-push-action@v6
+        with:
+          context: client
+          push: false
+          tags: devpulse-client:ci
+
+  # ---------------------------------------------------------------------------
+  terraform:
+  # ---------------------------------------------------------------------------
+  # Formatting and internal validity only - init runs with no backend and no
+  # AWS credentials, so this cannot reach AWS even accidentally. There is
+  # nothing here that plans or applies against a real account.
+    name: Terraform format + validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          # versions.tf's own required_version (">= 1.6.0") is the real
+          # constraint; this just tracks the newest CLI release rather than
+          # pinning a second, potentially-conflicting range here.
+          terraform_version: 'latest'
+
+      - name: Format check
+        working-directory: infrastructure/aws/terraform
+        run: terraform fmt -check -recursive
+
+      - name: Init (no backend, no credentials)
+        working-directory: infrastructure/aws/terraform
+        run: terraform init -backend=false
+
+      - name: Validate
+        working-directory: infrastructure/aws/terraform
+        run: terraform validate
