@@ -1,5 +1,60 @@
 # Development Log
 
+## Week 5, Day 25 — Task 106 — 2026-08-26
+
+Route-level integration tests for the four remaining route groups with no coverage: analytics, notifications, AI and webhooks. 48 new tests, server total now **121, all passing** (verified stable across 3 consecutive runs, no order-dependence). No application code changed — this task is pure test coverage. Followed the Task 102/103 test-DB + factories + supertest infrastructure and mocking policy (mock the outbound-HTTP boundary only, leave BullMQ real against test Redis) without needing to extend either.
+
+- **`routes/analytics.test.js`** (18 tests) — the overview, compare, PR/commit listing and per-contributor endpoints. Emphasizes the same cross-user-isolation shape as Task 103's repos suite: every `:id` route asserts both the 403 and that nothing about the other user's repo leaked into the response. One caching test (a second identical-range request must not reflect a PR added in between) and one true-negative test (an empty repo list from `/compare` must be `200 []`, not treated as an error). Two factory-usage bugs caught while writing this, not in application code: `createPullRequest`/`createCommit`'s default `createdAt`/`committedAt` (2026-01-01) predates the default 30-day analytics window, so per-contributor tests needed an explicit recent date or the summary legitimately came back empty.
+- **`routes/notifications.test.js`** (9 tests) — list/unread-count, mark-one-read, mark-all-read. `PATCH /:id/read` on another user's notification returns **404, not 403** — confirmed this is the existing, correct choice (`notificationService.markRead` looks up by id first and returns null on an owner mismatch, same as a genuinely missing id) since a 403 there would confirm the notification exists at all.
+- **`routes/ai.test.js`** (14 tests) — pr-summary, health-score, weekly-report (generate + persisted history), chat. New mock boundary: `../lib/openai.js`'s `chat()`, not `githubApiService` — this is the first route suite that talks to an LLM. `calculateHealthScore` deliberately excluded from the mock: it is pure arithmetic over PR/commit rows with no LLM call (confirmed by asserting `chat` was never invoked in that test), so it stays covered end-to-end rather than mocked. The weekly-report test also asserts the `WeeklyReport` row is actually persisted with the mocked content, not just that the response looks right.
+- **`routes/webhooks.test.js`** (7 tests) — HMAC signature verification (missing header, wrong signature), ping vs. push vs. other events, and the three branches that decide whether a sync gets queued (unknown `githubId`, `syncEnabled=false`, a sync already `running`). Signs the raw JSON body with the `GITHUB_WEBHOOK_SECRET` pinned in `.env.test.example`, matching what GitHub actually sends. One test-helper bug caught before it shipped: an object literal `{ signature: undefined }` passed to a destructured parameter with a default falls through to the default (JS destructuring treats an explicit `undefined` value as absent) — the "no signature header" test would have silently sent a valid one. Replaced with an explicit `omitSignature: true` flag instead of relying on `undefined`.
+
+### Not done (deliberately, next session's problem)
+- The BullMQ workers (`syncWorker`, `reportWorker`) are still untested at the consumption end — this task covers enqueue only (webhooks queuing a sync, same as Task 103's repo-connect flow), never a worker actually processing a job. Driving a worker in-process needs its own decision.
+- Client-side testing is still limited to pure functions and stateless presentational components — no data-fetching/effect coverage, no page-level tests.
+
+---
+
+## AWS deployment-readiness milestone (Task 104–105) — 2026-08-25 → 2026-08-26
+
+Separate from the Week 5 testing track and not in the original 150-task roadmap. Goal: make the repository credibly AWS-deployable — Terraform, production Docker images, CI/CD, ECS, RDS, ElastiCache, S3, Secrets Manager, CloudWatch — under a hard constraint of **$0 out of pocket, no AWS resources ever provisioned**. Broken into five sub-tasks with a review checkpoint after each.
+
+### 1. Production images and config hardening — 2026-08-25 (committed)
+- `server/Dockerfile` (multi-stage, `npm ci --omit=dev` + `prisma generate`, non-root `node` user, `tini` as PID 1 so ECS's SIGTERM on drain is forwarded) and `client/Dockerfile` (Vite build → `nginx-unprivileged`, static only).
+- `config/index.js` now **fails fast** in production on a missing `DATABASE_URL` or a `JWT_SECRET` left at the dev default — a crash-looping task is cheaper than one serving forgeable tokens. Added `TRUST_PROXY_HOPS` (rate limiting must key on the real client IP behind an ALB) and `RUN_WORKERS_IN_API` (in production the worker is its own service; two consumers would double-process every sync).
+- Liveness split from readiness: `/api/health` touches nothing external, `/api/health/ready` checks Postgres and Redis and reports booleans only — never the driver error, host or version, since it is reachable through the load balancer.
+- `src/worker.js` extracted as a dedicated entrypoint; Compose gained a `full` profile running the whole stack from the production images.
+
+### 2–3. Terraform — 2026-08-25
+`infrastructure/aws/terraform/`, ~2,100 lines across 16 files. VPC with public/private subnets per AZ; the ALB → ECS → RDS/ElastiCache security-group chain (data stores accept traffic only from the ECS security group, never from a CIDR block); ECR; ALB with path-routing (`/api/*` → backend, everything else → nginx, so there is no production CORS to manage); three Fargate services on ARM64/Graviton; separate execution and task roles; RDS Postgres; ElastiCache Redis with AUTH + TLS; S3 for future uploads; five Secrets Manager secrets, three of them Terraform-generated so there is no human-typed value to leak; CloudWatch log groups and seven optional alarms.
+
+Cost-shaped defaults throughout, each documented at its variable: `enable_nat_gateway = false` in the example tfvars (the NAT Gateway is ~$32/month idle, by far the largest fixed cost — tasks move to public subnets, still inbound-restricted to the ALB), no Multi-AZ, no automated backups, alarms off, Container Insights off, `secrets_recovery_window_days = 0`.
+
+### 4. CI/CD — 2026-08-25
+`.github/workflows/ci.yml` (the repository had none): server lint + the 73-test integration suite against Postgres/Redis service containers, client lint + tests + production build, both Docker images built and discarded, and `terraform fmt`/`validate` with `-backend=false`. Nothing in CI can reach AWS. `deploy-aws.yml` is inert behind two independent gates: a `vars.AWS_DEPLOY_ENABLED == 'true'` condition, and OIDC against a role that does not exist — there are no AWS credentials in this repository at all.
+
+### 5. Security review, validation sweep and docs — 2026-08-26
+
+Full read of all 2,100 lines of Terraform and both workflows against the application code. **Five findings, all fixed.**
+
+1. **ECR immutability and the `:latest` push were incompatible — the second deploy would have failed.** `ecr.tf` set `image_tag_mutability = "IMMUTABLE"` while `deploy-aws.yml` pushed `:${IMAGE_TAG}` *and* `:latest` every run; ECR rejects re-writing an existing tag. Resolved in favour of keeping immutability (a deployed tag can never be silently swapped — the stronger supply-chain property): the `:latest` push is gone, deploys tag `sha-<commit>` and render that exact tag into the task definition, and a new `var.bootstrap_image_tag` covers the one case that genuinely needs a fixed tag — the first apply, where a task definition must name *some* image that exists.
+2. **HTTP was never redirected to HTTPS.** Once `certificate_arn` was set, `:80` kept serving the application alongside the new HTTPS listener. Every API call carries an `Authorization: Bearer` token, so that was an alternate plaintext route for handing out JWTs. The `:80` listener now switches to a 301 redirect whenever a certificate exists, and the `http_api` rule is dropped in that case so the redirect catches every path. Related: `local.app_base_url` hardcoded `https://` whenever `app_domain` was set even with no certificate — scheme and host are now decided independently, so the OAuth callback URL can no longer advertise a scheme the ALB does not serve.
+3. **The ECR lifecycle policy matched nothing the pipeline pushed.** Rule 1 filtered on `tagPrefixList = ["v", "sha-", "latest"]` but the workflow tagged with a bare `github.sha`, which matched neither that list nor the untagged rule — those images would have accumulated and billed forever. The workflow now tags `sha-<commit>`, and `bootstrap` is deliberately excluded from the expiry list so a fresh apply's image is never expired out from under it.
+4. **Nothing applied Prisma migrations to the production database.** Neither the pipeline nor the container entrypoint ran them, so the first deploy would have booted the API against an RDS instance with no tables. The deploy workflow now runs `npx prisma migrate deploy` as a one-off Fargate task from the *new* image, before any service is updated — deploying first would mean serving requests against a schema missing its columns. A non-zero exit fails the job, leaving the services on the previous image rather than half-deploying against a half-migrated database. This works because `prisma` is a regular dependency rather than a devDependency, so the CLI and schema both survive `npm ci --omit=dev` into the production image. Three new outputs (`ecs_subnet_ids`, `ecs_security_group_id`, `ecs_assign_public_ip`) exist because `run-task`, unlike a service, has no stored network configuration to inherit.
+5. **Broken cross-reference.** Four `.tf` files cited "the standing no-provisioning policy in the repository root README" — the README had no AWS section at all. Now written down, with the three mechanisms that actually enforce it.
+
+**Reviewed and found already correct** (recorded so it is not re-litigated): IAM is genuinely least-privilege — Secrets Manager scoped to the five exact ARNs, S3 to one bucket's `uploads/` prefix, no `*` resources, and the frontend correctly has no task role since nginx calls no AWS API; RDS is non-public with encrypted storage; Redis has AUTH plus encryption in transit and at rest; all four credential variables are `sensitive`; state files and `terraform.tfvars` are gitignored, and `.terraform/` provider binaries are correctly ignored too; the readiness endpoint and the error handler both already withhold internals in production; both containers run non-root.
+
+**Validation sweep — all run, not assumed:** `tofu fmt -check -recursive` clean, `tofu validate` Success, `actionlint` clean on both workflows, server lint clean, client lint at exactly 149 problems (the recorded baseline — no regression), 73/73 server tests passing, 22/22 client tests passing. No application code was changed by this sub-task.
+
+**New: `docs/aws-deployment.md`** — architecture, the security posture and its reasoning, a per-component cost table, the full bootstrap sequence, OIDC and repository-variable setup, the deploy pipeline, adding TLS/alarms/remote state, teardown, and an honest known-gaps list (no autoscaling, no blue/green, no WAF, no VPC endpoints, backups off).
+
+### Notes
+- OpenTofu is used locally for `fmt`/`validate` (Homebrew no longer ships the Terraform CLI); CI uses real Terraform via `hashicorp/setup-terraform`. The configuration validates under both.
+- Both Dockerfiles pin `npm@11.12.1` before `npm ci`: `node:22-alpine` bundles npm 10, whose resolver treats this lockfile's `eslint@^9` / `@eslint/js@^10` optional peer conflict as fatal even under `--omit=dev`, where neither package is installed at all.
+
+---
+
 ## Week 5, Day 24 — Tasks 102–103 — 2026-08-24
 
 ### Tasks Completed
