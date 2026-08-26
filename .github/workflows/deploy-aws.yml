@@ -1,0 +1,253 @@
+# AWS deployment.
+#
+# NOT RUN as part of this deployment-readiness milestone, and safe to keep in
+# the repository exactly as committed: every AWS-specific value below is read
+# from a repository/environment variable (vars.*), none of which exist until
+# someone deliberately creates them after running `terraform apply` for real.
+# Two independent gates keep this workflow from doing anything by accident:
+#
+#   1. The `if: vars.AWS_DEPLOY_ENABLED == 'true'` condition on the job below.
+#      Repository variables default to unset (empty string, not "true"), so
+#      an accidental manual trigger of this workflow is a no-op - the job
+#      shows as skipped, nothing after this line executes.
+#   2. No AWS credentials are stored in this repository at all. Authentication
+#      uses OIDC (`permissions: id-token: write` + configure-aws-credentials)
+#      to assume a role that must already trust this specific repository -
+#      there is no access key here to leak in the first place.
+#
+# See docs/aws-deployment.md for what setting AWS_DEPLOY_ENABLED and the
+# other variables involves, and for why that document deliberately does not
+# instruct you to do it as part of this milestone.
+
+name: Deploy to AWS
+
+on:
+  # Fires once CI finishes on main - the "trigger after successful tests"
+  # step of a real deploy pipeline. Still gated by AWS_DEPLOY_ENABLED below,
+  # so this being wired up does not by itself cause a deployment.
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: [main]
+  # Manual trigger, for redeploying a specific previously-built image without
+  # pushing a new commit.
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy (defaults to the current commit SHA)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write # required to assume the AWS role via OIDC - no long-lived access keys involved
+
+concurrency:
+  group: deploy-aws-production
+  cancel-in-progress: false # never cancel a deploy that is already in flight
+
+jobs:
+  deploy:
+    name: Build, push and deploy
+    runs-on: ubuntu-latest
+    environment: production # supports GitHub's own required-reviewer gate on top of the two below, if configured
+    if: >
+      vars.AWS_DEPLOY_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+
+    env:
+      # "sha-" prefix, not a bare SHA: ecr.tf's lifecycle policy expires old
+      # images by tag prefix, and a bare 40-hex tag matches none of its rules,
+      # so those images would accumulate in the repository forever.
+      IMAGE_TAG: ${{ inputs.image_tag || format('sha-{0}', github.sha) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # --- Auth -----------------------------------------------------------------
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Log in to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # --- Build, tag, push -----------------------------------------------------
+      # Two images, not three: the worker service (below) reuses the backend
+      # image with its command overridden, exactly as server/Dockerfile and
+      # docker-compose.yml's "full" profile already do locally.
+      #
+      # One tag each, never a moving ":latest": ecr.tf sets the repositories to
+      # IMMUTABLE, so re-pushing an existing tag is rejected outright - a second
+      # deploy would fail here. Nothing downstream needs a moving tag anyway,
+      # since the deploy steps below render this exact immutable tag into each
+      # task definition.
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend/worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: server
+          push: true
+          tags: ${{ vars.ECR_BACKEND_REPOSITORY_URL }}:${{ env.IMAGE_TAG }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: client
+          push: true
+          tags: ${{ vars.ECR_FRONTEND_REPOSITORY_URL }}:${{ env.IMAGE_TAG }}
+
+      # --- Deploy: backend --------------------------------------------------------
+      # The task definition family and the ECS service share the same name in
+      # ecs.tf ("<project>-<environment>-backend"), which is why one variable
+      # (ECS_BACKEND_SERVICE) supplies both below.
+
+      - name: Download current backend task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "${{ vars.ECS_BACKEND_SERVICE }}" \
+            --query taskDefinition > backend-task-definition.json
+
+      - name: Render new backend image into task definition
+        id: render-backend
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: backend-task-definition.json
+          container-name: backend
+          image: ${{ vars.ECR_BACKEND_REPOSITORY_URL }}:${{ env.IMAGE_TAG }}
+
+      # Registered explicitly rather than by amazon-ecs-deploy-task-definition,
+      # because the migration step below has to run from this exact revision
+      # before any service starts using it.
+      - name: Register backend task definition
+        id: register-backend
+        run: |
+          arn=$(aws ecs register-task-definition \
+            --cli-input-json "file://${{ steps.render-backend.outputs.task-definition }}" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          echo "arn=$arn" >> "$GITHUB_OUTPUT"
+
+      # --- Database migrations ---------------------------------------------------
+      # A one-off Fargate task running the new image with its command
+      # overridden. This must happen before the service is updated: otherwise
+      # the new code starts serving requests against a schema that does not have
+      # its columns yet, and every request in that window fails.
+      #
+      # `prisma` is a regular dependency, not a devDependency, so both the CLI
+      # and prisma/schema.prisma survive `npm ci --omit=dev` into the production
+      # image - see server/Dockerfile. `migrate deploy` applies pending
+      # migrations only; it never generates, resets or prompts, and it takes an
+      # advisory lock, so a concurrent deploy waits rather than racing.
+      #
+      # A non-zero exit fails the job here, leaving the services running the
+      # previous image rather than half-deploying against a half-migrated
+      # database.
+      - name: Run database migrations
+        run: |
+          task_arn=$(aws ecs run-task \
+            --cluster "${{ vars.ECS_CLUSTER_NAME }}" \
+            --task-definition "${{ steps.register-backend.outputs.arn }}" \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ vars.ECS_SUBNET_IDS }}],securityGroups=[${{ vars.ECS_SECURITY_GROUP_ID }}],assignPublicIp=${{ vars.ECS_ASSIGN_PUBLIC_IP }}}" \
+            --overrides '{"containerOverrides":[{"name":"backend","command":["npx","prisma","migrate","deploy"]}]}' \
+            --query 'tasks[0].taskArn' \
+            --output text)
+
+          echo "Migration task: $task_arn"
+          aws ecs wait tasks-stopped \
+            --cluster "${{ vars.ECS_CLUSTER_NAME }}" --tasks "$task_arn"
+
+          exit_code=$(aws ecs describe-tasks \
+            --cluster "${{ vars.ECS_CLUSTER_NAME }}" --tasks "$task_arn" \
+            --query 'tasks[0].containers[0].exitCode' \
+            --output text)
+
+          if [ "$exit_code" != "0" ]; then
+            echo "::error::Migrations exited with code $exit_code - not updating any service."
+            aws ecs describe-tasks \
+              --cluster "${{ vars.ECS_CLUSTER_NAME }}" --tasks "$task_arn" \
+              --query 'tasks[0].stoppedReason' --output text
+            exit 1
+          fi
+
+      - name: Deploy backend service
+        run: |
+          aws ecs update-service \
+            --cluster "${{ vars.ECS_CLUSTER_NAME }}" \
+            --service "${{ vars.ECS_BACKEND_SERVICE }}" \
+            --task-definition "${{ steps.register-backend.outputs.arn }}"
+
+          aws ecs wait services-stable \
+            --cluster "${{ vars.ECS_CLUSTER_NAME }}" \
+            --services "${{ vars.ECS_BACKEND_SERVICE }}"
+
+      # --- Deploy: frontend -------------------------------------------------------
+
+      - name: Download current frontend task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "${{ vars.ECS_FRONTEND_SERVICE }}" \
+            --query taskDefinition > frontend-task-definition.json
+
+      - name: Render new frontend image into task definition
+        id: render-frontend
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: frontend-task-definition.json
+          container-name: frontend
+          image: ${{ vars.ECR_FRONTEND_REPOSITORY_URL }}:${{ env.IMAGE_TAG }}
+
+      - name: Deploy frontend service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-frontend.outputs.task-definition }}
+          service: ${{ vars.ECS_FRONTEND_SERVICE }}
+          cluster: ${{ vars.ECS_CLUSTER_NAME }}
+          wait-for-service-stability: true
+
+      # --- Deploy: worker ----------------------------------------------------------
+      # Same backend image, different task definition family/service - the
+      # worker's container command is already set to `node src/worker.js` in
+      # ecs.tf, so only the image needs updating here.
+
+      - name: Download current worker task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "${{ vars.ECS_WORKER_SERVICE }}" \
+            --query taskDefinition > worker-task-definition.json
+
+      - name: Render new worker image into task definition
+        id: render-worker
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: worker-task-definition.json
+          container-name: worker
+          image: ${{ vars.ECR_BACKEND_REPOSITORY_URL }}:${{ env.IMAGE_TAG }}
+
+      - name: Deploy worker service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-worker.outputs.task-definition }}
+          service: ${{ vars.ECS_WORKER_SERVICE }}
+          cluster: ${{ vars.ECS_CLUSTER_NAME }}
+          wait-for-service-stability: true
+
+      # --- Verification -------------------------------------------------------------
+      # amazon-ecs-deploy-task-definition already waited for each service to
+      # reach steady state above; this step additionally confirms the
+      # application is actually answering, not just that ECS considers the
+      # tasks healthy.
+
+      - name: Verify application health
+        run: |
+          curl --fail --silent --show-error "http://${{ vars.ALB_DNS_NAME }}/api/health"
+          curl --fail --silent --show-error "http://${{ vars.ALB_DNS_NAME }}/healthz"
