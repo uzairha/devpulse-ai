@@ -1,0 +1,19 @@
+# Terraform state - may contain resource attribute values, including
+# secret ARNs and connection details, in plaintext.
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# .terraform.lock.hcl is intentionally NOT ignored - it pins exact provider
+# versions (like package-lock.json) and should be committed so `tofu init` /
+# `terraform init` is reproducible for anyone who clones this repository.
+
+# Real variable values - see terraform.tfvars.example for the safe,
+# committed template this is copied from.
+terraform.tfvars
+*.auto.tfvars
+
+# Plan output can also contain sensitive values.
+*.tfplan
+crash.log
+crash.*.log
