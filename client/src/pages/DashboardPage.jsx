@@ -30,13 +30,15 @@ function DashboardPage() {
 
   useEffect(() => {
     if (!selectedId) return;
-    setLoading(true);
-    setError('');
-    api
-      .get(`/analytics/${selectedId}?${buildRangeQuery(range)}`)
-      .then((res) => setAnalytics(res.data))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    Promise.resolve().then(() => {
+      setLoading(true);
+      setError('');
+      api
+        .get(`/analytics/${selectedId}?${buildRangeQuery(range)}`)
+        .then((res) => setAnalytics(res.data))
+        .catch((err) => setError(err.message))
+        .finally(() => setLoading(false));
+    });
   }, [selectedId, range]);
 
   const { prMetrics: pr, commitMetrics: cm, trends, leaderboard, activityHeatmap, stalePrs, repo } = analytics || {};

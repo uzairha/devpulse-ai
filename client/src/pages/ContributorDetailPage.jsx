@@ -16,13 +16,15 @@ function ContributorDetailPage() {
   const [activeTab, setActiveTab] = useState('pull requests');
 
   useEffect(() => {
-    setLoading(true);
-    setError('');
-    api
-      .get(`/analytics/${id}/contributors/${encodeURIComponent(login)}?${buildRangeQuery(range)}`)
-      .then((res) => setSummary(res.data))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    Promise.resolve().then(() => {
+      setLoading(true);
+      setError('');
+      api
+        .get(`/analytics/${id}/contributors/${encodeURIComponent(login)}?${buildRangeQuery(range)}`)
+        .then((res) => setSummary(res.data))
+        .catch((err) => setError(err.message))
+        .finally(() => setLoading(false));
+    });
   }, [id, login, range]);
 
   return (

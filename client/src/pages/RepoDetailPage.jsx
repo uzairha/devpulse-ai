@@ -115,13 +115,15 @@ function RepoDetailPage() {
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
-    setLoading(true);
-    setError('');
-    api
-      .get(`/analytics/${id}?${buildRangeQuery(range)}`)
-      .then((res) => setAnalytics(res.data))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    Promise.resolve().then(() => {
+      setLoading(true);
+      setError('');
+      api
+        .get(`/analytics/${id}?${buildRangeQuery(range)}`)
+        .then((res) => setAnalytics(res.data))
+        .catch((err) => setError(err.message))
+        .finally(() => setLoading(false));
+    });
   }, [id, range]);
 
   const { prMetrics: pr, commitMetrics: cm, trends, leaderboard, activityHeatmap, stalePrs, repo } = analytics || {};

@@ -19,13 +19,15 @@ function ComparePage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    setLoading(true);
-    setError('');
-    api
-      .get(`/analytics/compare?${buildRangeQuery(range)}`)
-      .then((res) => setData(res.data))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    Promise.resolve().then(() => {
+      setLoading(true);
+      setError('');
+      api
+        .get(`/analytics/compare?${buildRangeQuery(range)}`)
+        .then((res) => setData(res.data))
+        .catch((err) => setError(err.message))
+        .finally(() => setLoading(false));
+    });
   }, [range]);
 
   return (

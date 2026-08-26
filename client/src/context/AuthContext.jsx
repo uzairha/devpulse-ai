@@ -8,15 +8,17 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
-    api.get('/auth/me')
-      .then((res) => setUser(res.data))
-      .catch(() => localStorage.removeItem('token'))
-      .finally(() => setIsLoading(false));
+    Promise.resolve().then(() => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+      api.get('/auth/me')
+        .then((res) => setUser(res.data))
+        .catch(() => localStorage.removeItem('token'))
+        .finally(() => setIsLoading(false));
+    });
   }, []);
 
   const login = useCallback(async ({ email, password }) => {

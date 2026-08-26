@@ -132,8 +132,10 @@ function ReposPage() {
   }, []);
 
   useEffect(() => {
-    fetchConnected();
-    fetchAvailable();
+    Promise.resolve().then(() => {
+      fetchConnected();
+      fetchAvailable();
+    });
     return () => clearInterval(pollRef.current);
   }, [fetchConnected, fetchAvailable]);
 

@@ -130,7 +130,9 @@ export function PrTable({ repoId, author }) {
       .finally(() => setLoading(false));
   }, [repoId, author]);
 
-  useEffect(() => { fetchPage(1, stateFilter, qDebounced); }, [fetchPage, stateFilter, qDebounced]);
+  useEffect(() => {
+    Promise.resolve().then(() => fetchPage(1, stateFilter, qDebounced));
+  }, [fetchPage, stateFilter, qDebounced]);
 
   const handleStateChange = (s) => { setStateFilter(s); fetchPage(1, s, qDebounced); };
 
@@ -246,7 +248,9 @@ export function CommitTable({ repoId, author }) {
       .finally(() => setLoading(false));
   }, [repoId, author]);
 
-  useEffect(() => { fetchPage(1, qDebounced); }, [fetchPage, qDebounced]);
+  useEffect(() => {
+    Promise.resolve().then(() => fetchPage(1, qDebounced));
+  }, [fetchPage, qDebounced]);
 
   const handleExport = async () => {
     setExporting(true);
