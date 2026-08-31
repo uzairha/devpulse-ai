@@ -8,7 +8,7 @@ import logger from '../lib/logger.js';
 
 const connection = { url: config.redisUrl };
 
-const processSync = async (job) => {
+export const processSync = async (job) => {
   const { repositoryId } = job.data;
 
   const repo = await prisma.repository.findUnique({

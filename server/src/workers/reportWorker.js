@@ -12,7 +12,7 @@ const connection = { url: config.redisUrl };
 // restart idempotent — BullMQ upserts the repeatable job instead of duplicating it.
 const CRON_PATTERN = '0 9 * * 1';
 
-const processWeeklyReports = async () => {
+export const processWeeklyReports = async () => {
   const repos = await prisma.repository.findMany({
     where: { user: { weeklyReportEmail: true } },
     include: { user: { select: { id: true } } },
