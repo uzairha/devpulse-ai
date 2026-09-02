@@ -1,5 +1,22 @@
 # Development Log
 
+## Week 5, Day 27 — Tasks 111–113 — 2026-09-02
+
+Component tests for the previously-uncovered shared UI. Client suite: 55 → **84**, all passing; lint unchanged.
+
+### Task 111 — `RepoTables` (`RepoTables.test.jsx`, 12 tests)
+- `PrStatusBadge`: Merged wins whenever `mergedAt` is set; Open / Closed otherwise.
+- `Pagination`: renders null at ≤1 page; shows "Page X of Y"; disables the previous arrow on page 1 and the next arrow on the last page; clicking an arrow calls `onPage(page ± 1)`.
+- `PrTable` / `CommitTable` (with `../services/api` mocked, wrapped in `MemoryRouter`): renders a row per record from `/analytics/:id/prs|commits`, shows the right empty state, and — for PrTable — refetches with `state=<tab>` in the query when a status filter tab is clicked.
+
+### Task 112 — presentational widgets (4 files, 13 tests)
+`PrSizeBreakdown`, `CommitTypeBreakdown`, `StalePrList`, `ContributorLeaderboard`. Each: renders nothing for missing/empty data (and, for PrSizeBreakdown, all-zero buckets); renders a row per datum with its label/count; plus one behaviour check per component — bar width scaled to the max bucket (the breakdowns), the `https://github.com/<repo>/pull/<n>` href with `target=_blank rel=noreferrer` (StalePrList), and 🥇🥈🥉-then-`#4` ranking with links to each contributor's detail page (ContributorLeaderboard).
+
+### Task 113 — `DateRangePicker` interaction (`DateRangePicker.test.jsx`, +4 tests)
+Beyond the existing pure `buildRangeQuery` tests: the active preset tab is marked and a click reports `{ days, startDate: null, endDate: null }`; "Custom" reveals two `input[type=date]`; a custom range is only reported via `onChange` once both dates are filled and `start <= end` (the draft-state fix from Task 82); and the picker opens straight into custom mode when the incoming `range` already carries both dates.
+
+---
+
 ## Week 5, Day 26 — Tasks 109–110 — 2026-09-01
 
 More client coverage, same session as Task 108. Client suite: 41 → **55**, all passing; lint unchanged (0 errors + the 1 pre-existing `ReportsPage` warning).
