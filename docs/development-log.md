@@ -1,5 +1,54 @@
 # Development Log
 
+## Week 5, Day 26 — Tasks 109–110 — 2026-09-01
+
+More client coverage, same session as Task 108. Client suite: 41 → **55**, all passing; lint unchanged (0 errors + the 1 pre-existing `ReportsPage` warning).
+
+### Task 109 — `services/api.js` interceptor tests
+`client/src/services/api.test.js` (8 tests). The axios instance registers its interceptors at import time, so the tests pull the handler functions straight off `api.interceptors.{request,response}.handlers[0]` and call them directly — no fake HTTP layer. Covers: the request interceptor attaching `Authorization: Bearer <token>` when a token is stored and leaving headers untouched when not; the response interceptor passing a success response through unchanged; rejection with the server's `error` message, with `'Something went wrong'` when the server sends none, and the same for a bare network error with no `response`; the 401 branch clearing the stored token and setting `window.location.href = '/login'`; and a non-401 error touching neither the token nor `location`. `window.location` is swapped for a plain `{ href: '' }` via `Object.defineProperty` per test and restored after.
+
+### Task 110 — `ProtectedRoute` and `ErrorBoundary` tests
+- `client/src/components/ProtectedRoute.test.jsx` (3 tests): mocks `useAuth`; renders nothing while `isLoading`, redirects to `/login` when there's no user (asserted through a real `MemoryRouter`/`Routes` with a `/login` stub route), renders children when a user is present.
+- `client/src/components/ErrorBoundary.test.jsx` (3 tests): renders children normally; renders the fallback with the thrown error's `message` when a child throws (a `Bomb` component gated on a module-level flag); "Try again" clears the error state and re-renders the now-working child. `console.error` is stubbed for the duration since React logs caught render errors.
+
+---
+
+## Week 5, Day 26 — Task 108 — 2026-09-01
+
+Page-level component tests for the two auth pages, building directly on the module-boundary mocking pattern from `AuthContext.test.jsx`. Here the boundary mocked is `../hooks/useAuth` (supplies `login`/`register` spies) and `react-router-dom`'s `useNavigate`, with a real `MemoryRouter` around the render so `<Link>` still resolves. `@testing-library/react`'s `fireEvent` throughout — still no `user-event` dependency. Client suite: 30 → **41**, all passing; client lint unchanged (0 errors, the 1 pre-existing `ReportsPage` `exhaustive-deps` warning).
+
+- **`client/src/pages/LoginPage.test.jsx`** (5 tests): renders the form + register link; a successful submit calls `login({ email, password })` then `navigate('/dashboard')`; a rejected `login` shows `err.message` in the error banner and does not navigate; the button is disabled and reads "Signing in..." while the promise is pending, then re-enables; a resubmit clears the previous error banner (the `setError('')` at the top of `handleSubmit`).
+- **`client/src/pages/RegisterPage.test.jsx`** (6 tests): renders the form + sign-in link; a matching-password submit calls `register({ email, password })` — asserting `confirmPassword` is dropped — then navigates; a mismatch shows "Passwords do not match", calls neither `register` nor `navigate`, and a corrected resubmit then succeeds; a rejected `register` shows the server message and does not navigate; the button is disabled and reads "Creating account..." while pending.
+- Query note: the auth pages' `<label>`s aren't associated with their inputs (no `htmlFor`/`id`), so `getByLabelText` doesn't work — selected inputs by placeholder text instead.
+
+---
+
+## Week 5, Day 25 — Task 107 + client testing start — 2026-08-28 → 2026-09-01
+
+**Status: verified 2026-09-01 — server 133/133, client 30/30.** These were written across three sessions during which an iCloud Drive sync daemon (`bird`), pegged at 60-85% CPU because the iCloud account was full, timed out `npm test`/`vitest` before its worker process could start (and stalled `git`). Resolved by moving the repo off iCloud to `~/code/devpulse-ai` and running the suites from a clean clone. See "Environment: moved off iCloud" below.
+
+### Task 107 — BullMQ worker consumption tests
+Enqueueing has been covered since Task 103/106 (repo-connect, webhooks); nothing exercised a worker actually processing a job. Decision: don't run a real BullMQ `Worker` against test Redis (non-deterministic, needs polling for async completion) — export the processor functions directly (`processSync` from `syncWorker.js`, `processWeeklyReports` from `reportWorker.js`, same precedent as Task 101's exported pure helpers) and call them with a fake job object. Reuses the Task 102/103 test-DB infra and mocking policy as-is.
+- `server/src/workers/syncWorker.test.js` (7 tests): full success path (PRs/commits persisted, job completed, `lastSyncAt` updated), notify-on-success gated by `syncNotifications`, the firstReviewAt-already-known skip-refetch behavior, a single PR's review-fetch failure not aborting the sync, the no-GitHub-token failure path (SyncJob → `failed`, `sync_failed` notification, error rethrown — exercises the fix made after Task 93), and no SyncJob row created for an unknown repository.
+- `server/src/workers/reportWorker.test.js` (5 tests): generate+persist+notify per opted-in repo, `weeklyReportEmail=false` skip, one report per repo for a multi-repo user, and one repo's generation failure not blocking another's (mocks `chat` to reject only when the prompt names a marker repo, since repo-processing order isn't guaranteed).
+- Verified: server suite goes 121 → **133**, all passing. Both worker test files needed no changes on first real run.
+
+### Client testing: first data-fetching/effect coverage
+Client tests up to now only covered pure functions and stateless presentational components. Decision: mock the shared `client/src/services/api.js` axios instance as the client's outbound-HTTP boundary — the direct equivalent of mocking `githubApiService`/`openai.js` on the server.
+- `client/src/context/AuthContext.test.jsx` (8 tests, via `renderHook`/`waitFor`/`act` from `@testing-library/react` — no `user-event` dependency added): `useAuth` outside a provider throws, initial load with/without a stored token, a rejected `/auth/me` clearing a stale token, login/register success + login failure, logout.
+- **Fix needed to make these run:** this project's Node 26 / jsdom 30 combo doesn't expose a working Web Storage in the test environment — `globalThis.localStorage` and `window.localStorage` both resolve to `undefined`, so every AuthContext test threw in `beforeEach` on `localStorage.clear()`. `client/src/test/setup.js` now installs a minimal in-memory `localStorage`/`sessionStorage` on both `globalThis` and `window`. The 8 tests were correct as written. Client suite: 22 → **30**, all passing.
+
+### Environment: moved off iCloud (2026-09-01)
+Root cause of the multi-session `bird` thrash: the iCloud account was full (`brctl quota` → ~2.9 KB free), so `bird` was stuck in an endless failed-upload retry loop that starved filesystem and process I/O in `~/Documents`. At one point `~/Documents` itself went empty locally. No data lost — everything was intact in the iCloud container and pushed to `origin/main`. Fix: cloned fresh from GitHub, reinstalled deps, and relocated the working copy to **`~/code/devpulse-ai`** (outside any synced folder); deleted the stale iCloud copy. `git status` went from 30+ s to 0.04 s. Docker compose project name is unchanged, so the existing DB volumes carried over.
+
+### Untracked CI-shakeout fixes (found via `git log`, not logged at the time)
+Three commits landed between Task 106 and this entry that never got a dev-log write-up — presumably from getting the new `ci.yml` workflow (added in the AWS milestone) to actually pass:
+- `7e929ce` — pinned `@eslint/js` back to `^9.39.5` (it had drifted to `^10.0.1` while `eslint` stayed on `^9.39.5`, and `@eslint/js`'s peer requirement made `npm ci` fail with `ERESOLVE` in CI) and regenerated both lockfiles.
+- `e385062` — disabled the `react/prop-types` lint rule in the client. The codebase never used PropTypes anywhere, so the rule was flagging 148 pre-existing violations the moment `npm ci` actually succeeded and lint could run for the first time in CI.
+- `fc038dd` — deferred several effects' direct async-fetch calls into a `Promise.resolve().then()` wrapper to satisfy `eslint-plugin-react-hooks`'s rule against synchronous `setState` inside an effect body (the fetch function set loading state before its first `await`). No behavior change.
+
+---
+
 ## Week 5, Day 25 — Task 106 — 2026-08-26
 
 Route-level integration tests for the four remaining route groups with no coverage: analytics, notifications, AI and webhooks. 48 new tests, server total now **121, all passing** (verified stable across 3 consecutive runs, no order-dependence). No application code changed — this task is pure test coverage. Followed the Task 102/103 test-DB + factories + supertest infrastructure and mocking policy (mock the outbound-HTTP boundary only, leave BullMQ real against test Redis) without needing to extend either.
