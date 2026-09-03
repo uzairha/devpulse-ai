@@ -1,5 +1,66 @@
 # Development Log
 
+## Week 6, Days 29–30 — Tasks 121–125 — Launch readiness — 2026-09-03
+
+Week 6's original scope (CI/CD, Docker, deployment) was almost entirely delivered early by the AWS deployment-readiness milestone (Tasks 104–105): production Dockerfiles, ~2,100 lines of Terraform, `ci.yml`, the inert `deploy-aws.yml`, and `docs/aws-deployment.md`. What remained was making the repo presentable and verifying the whole thing runs.
+
+### Task 121 — README
+Replaced the stub (`_Full README coming in Week 6._`) with a real one: feature table, stack table, local quick-start, the Docker `full`-profile path, how to run the test suites, a documentation index, and the deployment/no-provisioning section (kept verbatim from the old README — it was already accurate).
+
+### Task 122 — Launch checklist (`docs/LAUNCH.md`)
+A single sequenced runbook: pre-launch local verification, the one-time AWS bootstrap (pointing to `aws-deployment.md` for mechanics), the Secrets Manager inventory, wiring + running the deploy pipeline, a post-deploy smoke test, rollback procedures (previous-image redeploy, forward-only migration reversal, scale-to-zero), and the known gaps carried in.
+
+### Task 123 — full-stack smoke test
+`docker compose up -d`, `prisma migrate deploy`, `npm run seed`, `npm start`. Verified: `/api/health` 200 and `/api/health/ready` 200 with `{database: true, redis: true}`; both BullMQ workers start; real login → JWT; `GET /api/repos` returns the seeded repos; `GET /api/analytics/:id` returns correct aggregates (10 PRs / 7 merged / 20 commits for `testuser/frontend-app`); the Redis analytics cache serves the second identical request in ~6 ms. Not exercised (documented limitations): live GitHub sync (needs a real OAuth token) and webhook delivery (needs a public URL).
+
+### Task 124 — docs refresh
+`docs/architecture.md` stack table corrected — it still said "Render (API) + Vercel (UI)" and "Week 6" placeholders; now reflects AWS ECS/Fargate, the CI job list, and Terraform. Repository-structure block updated to the real layout (`app.js`/`index.js` split, `workers/`, `test/`, `infrastructure/`, the full route/service lists).
+
+### Task 125 — project wrap-up
+Roadmap Week 6 checked off; Project Summary added below. Final state: **293 tests** (146 server + 147 client) green, lint clean on both packages, CI covering lint/test/build/Docker/Terraform, and a reviewed-but-unapplied AWS deployment.
+
+---
+
+## Project Summary — 30 days, Tasks 1–125 (+ AWS milestone)
+
+DevPulse AI: a developer-analytics SaaS. Engineers connect GitHub repos and get PR/commit analytics, period-over-period trends, cross-repo comparison, an activity heatmap, a contributor leaderboard, AI PR summaries / weekly reports / health score / chat, and a deep-linked in-app notification centre — with light/dark theming, custom date ranges, and CSV/JSON export.
+
+- **Weeks 1–2 (Tasks 1–50):** foundation — Express + Prisma + Postgres, JWT + GitHub OAuth, the GitHub sync pipeline (BullMQ), the analytics API, and the dashboard.
+- **Week 3 (Tasks 51–75):** AI features (OpenAI), background jobs, webhooks, the contributor view, Redis caching, security hardening.
+- **Week 4 (Tasks 76–100):** UX and advanced analytics — trend deltas, search, the custom date-range picker, the comparison view, dark mode, the activity heatmap, scheduled weekly reports, clickable notifications, the stale-PR widget, review-turnaround and commit-compliance metrics.
+- **AWS milestone (Tasks 104–105):** production Dockerfiles + config hardening, full Terraform (VPC, ECS/Fargate ×3, RDS, ElastiCache, S3, Secrets Manager, CloudWatch), CI, an inert OIDC-gated deploy workflow, a security review — **$0, nothing provisioned.**
+- **Week 5 (Tasks 101–120):** from no tests to **293**. See the Week 5 Summary.
+- **Week 6 (Tasks 121–125):** README, launch checklist, a green full-stack smoke test, docs refresh.
+
+---
+
+## Week 5, Day 28 — Tasks 118–120 — 2026-09-03
+
+### Task 118 — remaining page tests (3 files, 14 tests)
+`ReposPage` (`api` mocked, `MemoryRouter`): connected + available lists with the count, search filtering, connect → `POST /repos`, the disconnect `ConfirmModal` flow → `DELETE /repos/:id`, and the connected-list load error. `RepoDetailPage` (routed with `MemoryRouter`/`Routes` so `useParams` resolves): overview renders the breadcrumb + PR metrics + health score, the never-synced warning, the analytics error banner, the Pull Requests tab mounting `PrTable`, and the Chat tab showing the assistant intro. `ContributorDetailPage`: breadcrumb + per-author metric cards, the PR table scoped with `author=`, the Commits tab, and the summary error banner.
+
+### Task 119 — analyticsService DB-backed unit tests (`analyticsService.db.test.js`, 13 tests)
+The Task 101 suite only covered the pure bucketing helpers; this exercises the query functions directly against the test database (existing factories + truncate-between-tests infra). `getPrMetrics` (zeroed on an empty window, state/merge-rate/avg-time-to-merge, window exclusion, review turnaround from `firstReviewAt`), `getCommitMetrics` (distinct contributors, conventional-commit compliance rate, window exclusion), `getStalePrs` (open-only, >7 days, oldest-first, `ageDays`, capped at 8), `getContributorLeaderboard` (PR+commit aggregation ranked by combined volume), and `getPeriodComparison` (current/previous split of equal length, `deltaPct` null when the previous window is empty and 0 when both are, author scoping).
+
+### Task 120 — Week 5 review and wrap-up
+Full lint on both packages (server clean; client 0 errors + the one pre-existing `ReportsPage` `exhaustive-deps` warning). Full suites green: **server 146, client 147 — 293 tests total**, from zero at the end of Week 4. Coverage now spans: server route integration (auth, repos, analytics, notifications, AI, webhooks), both BullMQ workers, the analytics service (helpers + queries) and controller range parsing; client — every page, every shared component, both contexts, the api-layer interceptors, and the routing guard. Known gaps deliberately left: the `Header` sub-components (`NotificationBell`/`RepoSwitcher` — internal, not exported), `aiService`/`notificationService`/`githubOAuthService` direct unit tests (exercised via the route suites), and any true end-to-end/browser layer. See the Week 5 Summary below.
+
+---
+
+## Week 5 Summary
+
+Went from no test suite at all to **293 automated tests** (146 server, 147 client) plus the CI workflow that runs them (lint + test on both packages, production client build, both Docker image builds, Terraform fmt/validate) on every push and PR.
+
+- **Infrastructure (Tasks 101–103):** Vitest on both packages; a separate `devpulse_test` Postgres database with truncate-between-tests, explicit factories (not the demo seed), real Redis on logical db 1, and safety guards that refuse to run against a non-`_test` DB or Redis db 0. `src/app.js` was split from `src/index.js` so the Express app can be imported without starting workers or binding a port.
+- **Server coverage (Tasks 102, 103, 106, 107, 119):** integration tests for all six route groups (with cross-user isolation asserted throughout), both workers via their exported processors, and the analytics service end to end.
+- **Client coverage (Tasks 101, 108–118):** `AuthContext`/`ThemeContext`, `useAuth`/`useTheme`, the `api.js` interceptors, `ProtectedRoute`, every shared component, and every page — data-fetching pages tested with `api` mocked at the module boundary and `MemoryRouter`.
+- **Bugs found by the new tests:** `buildDailyBuckets` used local time instead of UTC for bucket boundaries (off-by-one on non-UTC machines — fixed Task 101); Node 26 / jsdom 30 don't expose Web Storage in the test env (polyfilled in `client/src/test/setup.js`).
+- **Environment:** the repo was moved out of iCloud Drive (`~/Documents` → `~/code/devpulse-ai`) mid-week after a full iCloud account wedged the `bird` sync daemon and made `npm test`/`git` unusable.
+
+Carried into Week 6: the known gaps listed under Task 120; the pre-existing `redis.keys()` cache-invalidation pattern, the `ReportsPage` `exhaustive-deps` warning, and webhook-delivery-health being untestable without a public URL.
+
+---
+
 ## Week 5, Day 27 — Tasks 114–117 — 2026-09-02
 
 Client test coverage push toward finishing Week 5. Client suite: 84 → **133** (now level with the server's 133); lint unchanged (0 errors + the pre-existing `ReportsPage` `exhaustive-deps` warning).
