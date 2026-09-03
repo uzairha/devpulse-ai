@@ -12,9 +12,11 @@
 | AI | OpenAI API (gpt-4o-mini) | Week 3 |
 | Background Jobs | BullMQ + Redis | Week 2 |
 | Caching | Redis | Same instance as BullMQ |
-| Containerization | Docker + Docker Compose | Local dev infrastructure |
-| CI/CD | GitHub Actions | Week 6 |
-| Deployment | Render (API) + Vercel (UI) | Week 6 |
+| Containerization | Docker + Docker Compose | Local dev; production images per service |
+| Tests | Vitest + Testing Library + Supertest | ~293 tests; run in CI |
+| CI | GitHub Actions | `ci.yml` — lint + test both packages, client build, Docker builds, Terraform validate |
+| IaC | Terraform | `infrastructure/aws/terraform/` — reviewed, not applied |
+| Deployment target | AWS ECS/Fargate + RDS + ElastiCache + ALB | Described in `docs/aws-deployment.md`; no resources provisioned |
 
 ## Repository Structure
 
@@ -22,23 +24,28 @@
 devpulse-ai/
 ├── client/                   # React + Vite frontend
 │   └── src/
-│       ├── components/       # Reusable UI components
-│       │   └── Layout/       # Sidebar, Header, Layout shell
-│       ├── context/          # AuthContext
-│       ├── hooks/            # useAuth
+│       ├── components/       # Reusable UI components (+ Layout/ shell)
+│       ├── context/          # AuthContext, ThemeContext
+│       ├── hooks/            # useAuth, useTheme
 │       ├── pages/            # Route-level page components
-│       └── services/         # api.js (axios instance)
+│       ├── services/         # api.js (axios instance)
+│       └── test/             # Vitest setup
 ├── server/                   # Express API backend
 │   └── src/
-│       ├── config/           # Environment config module
-│       ├── controllers/      # Request handlers
-│       ├── lib/              # prisma.js, logger.js
+│       ├── app.js            # configured Express app (importable, no listen)
+│       ├── index.js          # entrypoint: app + workers + cron
+│       ├── config/           # environment config module
+│       ├── controllers/      # request handlers
+│       ├── lib/              # prisma, redis, queue, openai, cache, logger
 │       ├── middleware/       # requireAuth, validate, errorHandler
-│       ├── routes/           # auth.js, health.js
-│       └── services/         # authService, githubOAuthService
-├── docs/                     # Project documentation
-├── .github/workflows/        # CI/CD (Week 6)
-└── docker-compose.yml        # Local Postgres + Redis
+│       ├── routes/           # auth, repos, analytics, ai, notifications, webhooks, health
+│       ├── services/         # auth, githubOAuth, githubApi, analytics, ai, notification
+│       ├── workers/          # syncWorker, reportWorker (BullMQ)
+│       └── test/             # test-DB setup + factories
+├── infrastructure/aws/terraform/   # VPC, ECS, RDS, ElastiCache, S3, Secrets Manager
+├── docs/                     # project documentation
+├── .github/workflows/        # ci.yml, deploy-aws.yml (inert)
+└── docker-compose.yml        # local Postgres + Redis; "full" profile runs everything
 ```
 
 ## Authentication Flow
