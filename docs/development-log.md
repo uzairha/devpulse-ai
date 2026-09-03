@@ -1,5 +1,23 @@
 # Development Log
 
+## Week 5, Day 27 — Tasks 114–117 — 2026-09-02
+
+Client test coverage push toward finishing Week 5. Client suite: 84 → **133** (now level with the server's 133); lint unchanged (0 errors + the pre-existing `ReportsPage` `exhaustive-deps` warning).
+
+### Task 114 — presentational components (5 files, 26 tests)
+`OnboardingSteps` (step advances with `hasGithub`/`hasRepos`, correct CTA + `done`/`active` classes), `Skeleton` / `MetricsGridSkeleton` (default + custom sizing, card count), `ConfirmModal` (labels, handler wiring, `confirming` disables + "Working…", danger style, backdrop-click vs body-click), `ActivityChart` / `ThroughputChart` (null-on-empty, bar count capped at 30 and scaled to max, axis labels; SVG path + one dot per week), `ActivityHeatmap` (null on all-zero, 7 day-label rows, only active cells tinted + titled).
+
+### Task 115 — Sidebar and theme context (2 files, 6 tests)
+`Sidebar` (all five nav routes, `active` class on the current route via `MemoryRouter`), `ThemeContext`/`useTheme` (throws outside provider; OS-preference fallback via a stubbed `matchMedia`; stored theme wins over OS; `toggleTheme` flips, persists to `localStorage`, and sets `<html data-theme>`).
+
+### Task 116 — first page-level tests (4 files, 12 tests)
+`LandingPage` (name + Get Started → `/login`), `AuthCallbackPage` (stores `?token=` and redirects to `/dashboard`; no token → `navigate('/login?error=oauth_failed')`; interim message), `ComparePage` (loading indicator, row-per-repo with health/PR counts/merge rate, empty state, error message — `api` mocked, `MemoryRouter`), `DashboardPage` (onboarding when no repos; PR metrics render after `/repos` then `/analytics/:id`; "No data yet" when `repo.lastSyncAt` is null; error banner on analytics failure — `api` + `useAuth` mocked).
+
+### Task 117 — Settings and Reports pages (2 files, 13 tests)
+`SettingsPage` (`useAuth`/`useTheme`/`api` mocked): account email + connected GitHub handle, Connect-GitHub link when unlinked, dark-mode toggle reflects theme + calls `toggleTheme`, Save sends `PATCH /auth/settings` with both prefs and shows "Preferences saved.", save failure surfaces, Sign out calls `logout`. `ReportsPage` (`api` mocked, `MemoryRouter`): empty state, repo picker + generate prompt, generate → `POST /ai/weekly-report/:id` renders the split body, generate failure, and `?repo=` deep-link auto-selecting the repo and auto-viewing its latest saved report.
+
+---
+
 ## Week 5, Day 27 — Tasks 111–113 — 2026-09-02
 
 Component tests for the previously-uncovered shared UI. Client suite: 55 → **84**, all passing; lint unchanged.
