@@ -37,7 +37,7 @@ describe('ReportsPage', () => {
   it('renders the repo picker and the generate prompt once repos load', async () => {
     renderAt();
     expect(await screen.findByRole('button', { name: /Generate weekly report/ })).toBeInTheDocument();
-    expect(screen.getByText(/Select a repository and click/)).toBeInTheDocument();
+    expect(screen.getByText(/Select a repository and generate/)).toBeInTheDocument();
   });
 
   it('generates a report and renders its body', async () => {

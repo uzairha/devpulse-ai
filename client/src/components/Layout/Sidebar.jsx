@@ -2,11 +2,11 @@ import { NavLink } from 'react-router-dom';
 import './Layout.css';
 
 const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: '▦' },
-  { to: '/repos', label: 'Repositories', icon: '⌥' },
-  { to: '/compare', label: 'Compare', icon: '⇄' },
-  { to: '/reports', label: 'Reports', icon: '◈' },
-  { to: '/settings', label: 'Settings', icon: '⚙' },
+  { to: '/dashboard', label: 'Dashboard' },
+  { to: '/repos', label: 'Repositories' },
+  { to: '/compare', label: 'Compare' },
+  { to: '/reports', label: 'Reports' },
+  { to: '/settings', label: 'Settings' },
 ];
 
 function Sidebar() {
@@ -14,13 +14,12 @@ function Sidebar() {
     <aside className="sidebar">
       <div className="sidebar-logo">DevPulse AI</div>
       <nav className="sidebar-nav">
-        {navItems.map(({ to, label, icon }) => (
+        {navItems.map(({ to, label }) => (
           <NavLink
             key={to}
             to={to}
             className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
           >
-            <span className="sidebar-icon">{icon}</span>
             {label}
           </NavLink>
         ))}

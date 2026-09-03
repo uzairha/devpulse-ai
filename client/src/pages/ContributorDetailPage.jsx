@@ -75,13 +75,16 @@ function ContributorDetailPage() {
           </section>
 
           <div className="detail-tabs">
-            {['pull requests', 'commits'].map((tab) => (
+            {[
+              ['pull requests', 'Pull Requests'],
+              ['commits', 'Commits'],
+            ].map(([tab, label]) => (
               <button
                 key={tab}
                 className={`detail-tab ${activeTab === tab ? 'active' : ''}`}
                 onClick={() => setActiveTab(tab)}
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {label}
               </button>
             ))}
           </div>

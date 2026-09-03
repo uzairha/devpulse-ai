@@ -23,12 +23,10 @@ describe('ContributorLeaderboard', () => {
     expect(renderBoard(null).container).toBeEmptyDOMElement();
   });
 
-  it('gives medals to the top three and a numbered rank after that', () => {
-    renderBoard(rows);
-    expect(screen.getByText('🥇')).toBeInTheDocument();
-    expect(screen.getByText('🥈')).toBeInTheDocument();
-    expect(screen.getByText('🥉')).toBeInTheDocument();
-    expect(screen.getByText('#4')).toBeInTheDocument();
+  it('numbers each contributor by rank', () => {
+    const { container } = renderBoard(rows);
+    const ranks = [...container.querySelectorAll('.leaderboard-rank')].map((el) => el.textContent);
+    expect(ranks).toEqual(['1', '2', '3', '4']);
   });
 
   it('shows each contributor with PR/commit counts and links to their detail page', () => {

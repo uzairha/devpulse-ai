@@ -162,12 +162,6 @@
   border-radius: 12px;
 }
 
-.placeholder-icon {
-  font-size: 2rem;
-  color: var(--border-strong);
-  margin-bottom: 0.75rem;
-}
-
 .reports-placeholder p {
   max-width: 380px;
   margin: 0 auto;

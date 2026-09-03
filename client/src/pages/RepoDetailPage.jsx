@@ -96,7 +96,7 @@ function HealthScoreCard({ repoId }) {
         {Object.entries(health.breakdown).map(([k, v]) => (
           <div key={k} className="health-item">
             <span className="health-item-label">
-              {k.replace(/([A-Z])/g, ' $1').toLowerCase()}
+              {k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase())}
             </span>
             <span className="health-item-val">{v}%</span>
           </div>
@@ -152,20 +152,25 @@ function RepoDetailPage() {
               }}
               title="Export analytics as JSON"
             >
-              ↓ Export
+              Export JSON
             </button>
           )}
         </div>
       </div>
 
       <div className="detail-tabs">
-        {['overview', 'pull requests', 'commits', 'chat'].map((tab) => (
+        {[
+          ['overview', 'Overview'],
+          ['pull requests', 'Pull Requests'],
+          ['commits', 'Commits'],
+          ['chat', 'Chat'],
+        ].map(([tab, label]) => (
           <button
             key={tab}
             className={`detail-tab ${activeTab === tab ? 'active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {label}
           </button>
         ))}
       </div>

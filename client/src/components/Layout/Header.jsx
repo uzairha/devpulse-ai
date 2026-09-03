@@ -136,7 +136,7 @@ function NotificationBell() {
     setUnread((c) => Math.max(0, c - 1));
   };
 
-  const TYPE_ICONS = { sync_failed: '✕', weekly_report: '✦' };
+  const TYPE_ICONS = { sync_failed: '✕', weekly_report: '•' };
   const typeIcon = (type) => TYPE_ICONS[type] ?? '✓';
   const TYPE_ICON_CLASS = { sync_failed: 'notif-icon--fail', weekly_report: 'notif-icon--info' };
   const typeIconClass = (type) => TYPE_ICON_CLASS[type] ?? 'notif-icon--ok';
@@ -216,7 +216,7 @@ function Header() {
         </div>
         {menuOpen && (
           <div className="avatar-dropdown">
-            <button onClick={handleLogout}>Logout</button>
+            <button onClick={handleLogout}>Sign out</button>
           </div>
         )}
       </div>

@@ -2,8 +2,8 @@ function LandingPage() {
   return (
     <div className="landing">
       <h1>DevPulse AI</h1>
-      <p>AI-powered developer analytics. Connect your GitHub repositories and get intelligent insights into your engineering velocity.</p>
-      <a href="/login">Get Started</a>
+      <p>Developer analytics for GitHub. Connect a repository to track pull requests, review turnaround, and commit activity, with weekly summaries written for you.</p>
+      <a href="/login">Get started</a>
     </div>
   );
 }

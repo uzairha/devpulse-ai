@@ -78,7 +78,7 @@ describe('RepoDetailPage', () => {
     renderAt();
     await screen.findByText('octo/api');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pull requests' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pull Requests' }));
     await screen.findByText(/No pull requests found/);
     expect(api.get).toHaveBeenCalledWith(expect.stringContaining('/analytics/r1/prs'));
   });

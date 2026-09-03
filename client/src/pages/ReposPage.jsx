@@ -33,7 +33,7 @@ function ConnectedRepoCard({ repo, onDisconnect, onSync, onEnableAutoSync, disco
           <SyncStatus status={repo.syncStatus} lastSyncAt={repo.lastSyncAt} />
           {repo.webhookId ? (
             <span className="sync-badge sync-badge--webhook" title="Auto-syncs on GitHub push">
-              ⚡ Auto-sync
+              Auto-sync
             </span>
           ) : (
             <button
@@ -58,7 +58,7 @@ function ConnectedRepoCard({ repo, onDisconnect, onSync, onEnableAutoSync, disco
           disabled={syncing || repo.syncStatus === 'running'}
           title="Sync now"
         >
-          {syncing || repo.syncStatus === 'running' ? '…' : '↻'}
+          {syncing || repo.syncStatus === 'running' ? 'Syncing…' : 'Sync'}
         </button>
         <button
           className="repo-btn repo-btn--danger"

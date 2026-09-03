@@ -87,7 +87,7 @@ function PrRow({ pr, repoId, showAuthor }) {
         <td className="col-date">{new Date(pr.createdAt).toLocaleDateString()}</td>
         <td>
           <button className="summarize-btn" onClick={handleSummarize} disabled={loadingSummary}>
-            {loadingSummary ? '…' : summary ? (expanded ? '▲' : '▼') : '✦ AI'}
+            {loadingSummary ? '…' : summary ? (expanded ? 'Hide' : 'Show') : 'Summarize'}
           </button>
         </td>
       </tr>
@@ -185,7 +185,7 @@ export function PrTable({ repoId, author }) {
           />
           {data?.total > 0 && (
             <button className="export-btn" onClick={handleExport} disabled={exporting} title="Export as CSV">
-              {exporting ? '…' : '↓ CSV'}
+              {exporting ? '…' : 'Export CSV'}
             </button>
           )}
         </div>
@@ -209,7 +209,7 @@ export function PrTable({ repoId, author }) {
               <th>State</th>
               <th>+/-</th>
               <th>Created</th>
-              <th>AI</th>
+              <th>Summary</th>
             </tr>
           </thead>
           <tbody>
@@ -287,7 +287,7 @@ export function CommitTable({ repoId, author }) {
         />
         {data?.total > 0 && (
           <button className="export-btn" onClick={handleExport} disabled={exporting} title="Export as CSV">
-            {exporting ? '…' : '↓ CSV'}
+            {exporting ? '…' : 'Export CSV'}
           </button>
         )}
       </div>
